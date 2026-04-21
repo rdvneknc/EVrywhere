@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "7631085656",
+    "project_id": "evrywhere-85bc5",
+    "storage_bucket": "evrywhere-85bc5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:7631085656:android:105d13bc5c6ed159c32a2d",
+        "android_client_info": {
+          "package_name": "com.example.evrywhere"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDNLz3xvyVu6adF7ZsopXfgh5ssfmIkgmw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

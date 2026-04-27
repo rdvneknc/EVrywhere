@@ -35,6 +35,7 @@ class EvListing {
   final String drivetrain;   // Önden Çekiş / Arkadan İtiş / 4x4
   final List<String> paintedParts;
   final List<String> replacedParts;
+  final List<String> photos; // file paths of uploaded photos
 
   const EvListing({
     required this.id, required this.brandId, required this.model,
@@ -53,6 +54,7 @@ class EvListing {
     this.drivetrain = 'Arkadan İtiş',
     this.paintedParts = const [],
     this.replacedParts = const [],
+    this.photos = const [],
   });
 }
 
@@ -166,6 +168,31 @@ List<EvListing> _generateListings(String brandId, String model) {
                        'Önden Çekiş','4x4','Önden Çekiş','Arkadan İtiş',
                        'Önden Çekiş','Arkadan İtiş','4x4','Önden Çekiş'];
 
+  // Her ilan için 3-5 demo fotoğraf (seed tabanlı picsum)
+  List<String> _mockPhotos(int i) {
+    final seeds = [
+      [10, 20, 30],
+      [41, 51, 61, 71],
+      [82, 92, 102],
+      [113, 123, 133, 143],
+      [154, 164, 174],
+      [185, 195, 205, 215],
+      [226, 236, 246],
+      [257, 267, 277, 287],
+      [298, 308, 318],
+      [329, 339, 349, 359],
+      [370, 380, 390],
+      [401, 411, 421, 431],
+      [442, 452, 462],
+      [473, 483, 493, 503],
+      [514, 524, 534],
+      [545, 555, 565, 575],
+    ];
+    return seeds[i % seeds.length]
+        .map((s) => 'https://picsum.photos/seed/$s/800/480')
+        .toList();
+  }
+
   return List.generate(16, (i) {
     final s = sellers[i];
     return EvListing(
@@ -193,6 +220,7 @@ List<EvListing> _generateListings(String brandId, String model) {
       drivetrain: drivetrains[i],
       paintedParts: _mockPainted[i % _mockPainted.length],
       replacedParts: _mockReplaced[i % _mockReplaced.length],
+      photos: _mockPhotos(i),
     );
   });
 }
@@ -1463,6 +1491,9 @@ class ListingDetailScreen extends StatefulWidget {
 }
 
 class _ListingDetailScreenState extends State<ListingDetailScreen> {
+  int _currentPhoto = 0;
+  late final PageController _pageCtrl;
+
   String _fmt(int p) {
     if (p >= 1000000) {
       final m = p / 1000000;
@@ -1472,187 +1503,302 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _pageCtrl = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  void _openPhotoViewer(BuildContext context, List<String> photos, int index) {
+    Navigator.of(context).push(PageRouteBuilder(
+      opaque: false,
+      barrierColor: Colors.transparent,
+      pageBuilder: (_, __, ___) =>
+          _PhotoViewerScreen(photos: photos, initialIndex: index),
+      transitionsBuilder: (_, anim, __, child) =>
+          FadeTransition(opacity: anim, child: child),
+      transitionDuration: const Duration(milliseconds: 220),
+    ));
+  }
+
+  Widget _buildPhotoHeader(EvListing listing) {
+    final photos = listing.photos;
+    if (photos.isEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: listing.gradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Stack(children: [
+          Center(child: Text(listing.emoji,
+              style: const TextStyle(fontSize: 80))),
+          Positioned(
+            bottom: 16, right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(_fmt(listing.price), style: const TextStyle(
+                fontSize: 20, fontWeight: FontWeight.w800,
+                color: Colors.white,
+              )),
+            ),
+          ),
+        ]),
+      );
+    }
+
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _pageCtrl,
+          itemCount: photos.length,
+          onPageChanged: (i) => setState(() => _currentPhoto = i),
+          itemBuilder: (_, i) {
+            final src = photos[i];
+            final isNetwork = src.startsWith('http');
+            final img = isNetwork
+                ? Image.network(src, fit: BoxFit.cover, width: double.infinity,
+                    loadingBuilder: (_, child, progress) => progress == null
+                        ? child
+                        : Container(color: Colors.black12,
+                            child: const Center(
+                                child: CircularProgressIndicator(strokeWidth: 2))))
+                : Image.file(File(src), fit: BoxFit.cover, width: double.infinity);
+            return GestureDetector(
+              onTap: () => _openPhotoViewer(context, photos, i),
+              child: img,
+            );
+          },
+        ),
+        // dot indicators
+        Positioned(
+          bottom: 14,
+          left: 0, right: 0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(photos.length, (i) => AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: _currentPhoto == i ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: _currentPhoto == i
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            )),
+          ),
+        ),
+        // price badge
+        Positioned(
+          bottom: 14, right: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(_fmt(listing.price), style: const TextStyle(
+              fontSize: 20, fontWeight: FontWeight.w800,
+              color: Colors.white,
+            )),
+          ),
+        ),
+        // photo counter
+        Positioned(
+          top: 12, right: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${_currentPhoto + 1}/${photos.length}',
+              style: const TextStyle(
+                color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final listing = widget.listing;
     final damageColor = listing.damageStatus == 'Kazasız'
         ? EVColors.primary : const Color(0xFFD94F3D);
     return Scaffold(
       backgroundColor: EVColors.background,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 240, pinned: true,
-            backgroundColor: EVColors.background,
-            leading: GestureDetector(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Photo carousel ──────────────────────
+                SizedBox(
+                  height: 280,
+                  child: _buildPhotoHeader(listing),
+                ),
+
+                // ── Detail content ───────────────────────
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${listing.year} ${listing.model}',
+                        style: const TextStyle(
+                          fontSize: 22, fontWeight: FontWeight.w800,
+                          color: EVColors.textPrimary,
+                        )),
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        _badge(listing.damageStatus,
+                            damageColor.withValues(alpha: 0.12), damageColor),
+                        const SizedBox(width: 8),
+                        _badge(
+                          listing.sellerType,
+                          listing.sellerType == 'Sahibinden'
+                              ? EVColors.primaryLight : const Color(0xFFE8F0FC),
+                          listing.sellerType == 'Sahibinden'
+                              ? EVColors.primary : const Color(0xFF1A5FA5),
+                        ),
+                      ]),
+                      const SizedBox(height: 20),
+                      _infoCard([
+                        (Icons.speed_rounded, 'Kilometre',
+                            '${(listing.km/1000).toStringAsFixed(1)}K km',
+                            EVColors.textPrimary),
+                        (Icons.battery_charging_full_rounded, 'Batarya Sağlığı',
+                            '%${listing.batteryHealth}',
+                            listing.batteryHealth >= 95
+                                ? EVColors.primary : const Color(0xFFEF9F27)),
+                        (Icons.electric_bolt_rounded, 'Menzil',
+                            '${listing.range} km', EVColors.textPrimary),
+                        (Icons.battery_full_rounded, 'Pil Kapasitesi',
+                            '${listing.batteryCapacity} kWh', const Color(0xFF1C69D4)),
+                        (Icons.ev_station_rounded, 'AC Şarj',
+                            '${listing.acChargePower} kW', const Color(0xFF2DC653)),
+                        (Icons.bolt_rounded, 'DC Şarj',
+                            '${listing.dcChargePower} kW', const Color(0xFFEF9F27)),
+                        (Icons.palette_rounded, 'Renk',
+                            listing.color, EVColors.textPrimary),
+                        (Icons.verified_user_rounded, 'Garanti',
+                            listing.warranty,
+                            listing.warranty == 'Yok'
+                                ? EVColors.textHint : const Color(0xFF9B59B6)),
+                        (Icons.car_crash_rounded, 'Hasar Durumu',
+                            listing.damageStatus,
+                            listing.damageStatus == 'Kazasız'
+                                ? EVColors.primary : const Color(0xFFD94F3D)),
+                        (Icons.speed_outlined, 'Motor Gücü',
+                            '${listing.motorPower} HP',
+                            const Color(0xFFEF9F27)),
+                        (Icons.swap_horiz_rounded, 'Çekiş',
+                            listing.drivetrain,
+                            const Color(0xFF1C69D4)),
+                        (Icons.calendar_today_rounded, 'Yıl',
+                            '${listing.year}', EVColors.textPrimary),
+                        (Icons.location_on_rounded, 'Konum',
+                            listing.location, EVColors.textPrimary),
+                      ]),
+                      const SizedBox(height: 16),
+                      _VehicleDiagram(
+                        painted: listing.paintedParts,
+                        replaced: listing.replacedParts,
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: EVColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: EVColors.border),
+                        ),
+                        child: Row(children: [
+                          Container(
+                            width: 44, height: 44,
+                            decoration: BoxDecoration(
+                              color: listing.sellerColor.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(child: Text(listing.sellerInitials,
+                              style: TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w700,
+                                color: listing.sellerColor,
+                              ))),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(listing.sellerName, style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w700,
+                                color: EVColors.textPrimary,
+                              )),
+                              Text(listing.postedAgo, style: const TextStyle(
+                                fontSize: 12, color: EVColors.textSecondary,
+                              )),
+                            ],
+                          )),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: EVColors.primaryLight,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.verified_rounded,
+                                    size: 13, color: EVColors.primary),
+                                SizedBox(width: 4),
+                                Text('Topluluk', style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.w600,
+                                  color: EVColors.primary,
+                                )),
+                              ]),
+                          ),
+                        ]),
+                      ),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Floating back button ─────────────────────
+          SafeArea(
+            child: GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Container(
-                margin: const EdgeInsets.all(8),
+                margin: const EdgeInsets.all(12),
+                width: 36, height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
+                  color: Colors.black.withValues(alpha: 0.35),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.arrow_back_rounded,
                     color: Colors.white, size: 18),
-              ),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: listing.gradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Stack(children: [
-                  Center(child: Text(listing.emoji,
-                      style: const TextStyle(fontSize: 80))),
-                  Positioned(
-                    bottom: 16, right: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.55),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(_fmt(listing.price), style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      )),
-                    ),
-                  ),
-                ]),
-              ),
-            ),
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${listing.year} ${listing.model}',
-                    style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.w800,
-                      color: EVColors.textPrimary,
-                    )),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    _badge(listing.damageStatus,
-                        damageColor.withValues(alpha: 0.12), damageColor),
-                    const SizedBox(width: 8),
-                    _badge(
-                      listing.sellerType,
-                      listing.sellerType == 'Sahibinden'
-                          ? EVColors.primaryLight : const Color(0xFFE8F0FC),
-                      listing.sellerType == 'Sahibinden'
-                          ? EVColors.primary : const Color(0xFF1A5FA5),
-                    ),
-                  ]),
-                  const SizedBox(height: 20),
-                  _infoCard([
-                    (Icons.speed_rounded, 'Kilometre',
-                        '${(listing.km/1000).toStringAsFixed(1)}K km',
-                        EVColors.textPrimary),
-                    (Icons.battery_charging_full_rounded, 'Batarya Sağlığı',
-                        '%${listing.batteryHealth}',
-                        listing.batteryHealth >= 95
-                            ? EVColors.primary : const Color(0xFFEF9F27)),
-                    (Icons.electric_bolt_rounded, 'Menzil',
-                        '${listing.range} km', EVColors.textPrimary),
-                    (Icons.battery_full_rounded, 'Pil Kapasitesi',
-                        '${listing.batteryCapacity} kWh', const Color(0xFF1C69D4)),
-                    (Icons.ev_station_rounded, 'AC Şarj',
-                        '${listing.acChargePower} kW', const Color(0xFF2DC653)),
-                    (Icons.bolt_rounded, 'DC Şarj',
-                        '${listing.dcChargePower} kW', const Color(0xFFEF9F27)),
-                    (Icons.palette_rounded, 'Renk',
-                        listing.color, EVColors.textPrimary),
-                    (Icons.verified_user_rounded, 'Garanti',
-                        listing.warranty,
-                        listing.warranty == 'Yok'
-                            ? EVColors.textHint : const Color(0xFF9B59B6)),
-                    (Icons.car_crash_rounded, 'Hasar Durumu',
-                        listing.damageStatus,
-                        listing.damageStatus == 'Kazasız'
-                            ? EVColors.primary : const Color(0xFFD94F3D)),
-                    (Icons.speed_outlined, 'Motor Gücü',
-                        '${listing.motorPower} HP',
-                        const Color(0xFFEF9F27)),
-                    (Icons.swap_horiz_rounded, 'Çekiş',
-                        listing.drivetrain,
-                        const Color(0xFF1C69D4)),
-                    (Icons.calendar_today_rounded, 'Yıl',
-                        '${listing.year}', EVColors.textPrimary),
-                    (Icons.location_on_rounded, 'Konum',
-                        listing.location, EVColors.textPrimary),
-                  ]),
-                  const SizedBox(height: 16),
-                  // Araç şeması
-                  _VehicleDiagram(
-                    painted: listing.paintedParts,
-                    replaced: listing.replacedParts,
-                  ),
-                  const SizedBox(height: 16),
-                  // Satıcı
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: EVColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: EVColors.border),
-                    ),
-                    child: Row(children: [
-                      Container(
-                        width: 44, height: 44,
-                        decoration: BoxDecoration(
-                          color: listing.sellerColor.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(child: Text(listing.sellerInitials,
-                          style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w700,
-                            color: listing.sellerColor,
-                          ))),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(listing.sellerName, style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w700,
-                            color: EVColors.textPrimary,
-                          )),
-                          Text(listing.postedAgo, style: const TextStyle(
-                            fontSize: 12, color: EVColors.textSecondary,
-                          )),
-                        ],
-                      )),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: EVColors.primaryLight,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.verified_rounded,
-                                size: 13, color: EVColors.primary),
-                            SizedBox(width: 4),
-                            Text('Topluluk', style: TextStyle(
-                              fontSize: 11, fontWeight: FontWeight.w600,
-                              color: EVColors.primary,
-                            )),
-                          ]),
-                      ),
-                    ]),
-                  ),
-                  const SizedBox(height: 100),
-                ],
               ),
             ),
           ),
@@ -2606,7 +2752,10 @@ class _NewListingSheetState extends State<_NewListingSheet> {
           SizedBox(
             width: double.infinity,
             child: GestureDetector(
-              onTap: () => Navigator.pop(context),
+              onTap: () => Navigator.pop(
+                context,
+                _photos.map((f) => f.path).toList(),
+              ),
               child: Container(
                 height: 52,
                 decoration: BoxDecoration(
@@ -3012,4 +3161,190 @@ class _IlanVerFab extends StatelessWidget {
       ]),
     ),
   );
+}
+
+// ─────────────────────────────────────────────
+//  FULL-SCREEN PHOTO VIEWER
+// ─────────────────────────────────────────────
+class _PhotoViewerScreen extends StatefulWidget {
+  final List<String> photos;
+  final int initialIndex;
+  const _PhotoViewerScreen({required this.photos, required this.initialIndex});
+
+  @override
+  State<_PhotoViewerScreen> createState() => _PhotoViewerScreenState();
+}
+
+class _PhotoViewerScreenState extends State<_PhotoViewerScreen>
+    with SingleTickerProviderStateMixin {
+  late final PageController _pageCtrl;
+  late int _current;
+  late final List<TransformationController> _transformCtrls;
+  late final AnimationController _bgAnim;
+  late final Animation<Color?> _bgColor;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initialIndex;
+    _pageCtrl = PageController(initialPage: widget.initialIndex);
+    _transformCtrls = List.generate(
+        widget.photos.length, (_) => TransformationController());
+
+    _bgAnim = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 220), value: 1.0);
+    _bgColor = ColorTween(
+      begin: Colors.transparent,
+      end: Colors.black,
+    ).animate(_bgAnim);
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    for (final c in _transformCtrls) {
+      c.dispose();
+    }
+    _bgAnim.dispose();
+    super.dispose();
+  }
+
+  bool _isZoomed(int index) {
+    return _transformCtrls[index].value != Matrix4.identity();
+  }
+
+  void _resetZoom(int index) {
+    _transformCtrls[index].value = Matrix4.identity();
+  }
+
+  void _handleTap(int index) {
+    if (_isZoomed(index)) {
+      _resetZoom(index);
+    } else {
+      _close();
+    }
+  }
+
+  void _close() {
+    _bgAnim.reverse().then((_) {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  Widget _buildImage(String src) {
+    if (src.startsWith('http')) {
+      return Image.network(
+        src,
+        fit: BoxFit.contain,
+        loadingBuilder: (_, child, progress) => progress == null
+            ? child
+            : const Center(
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white)),
+      );
+    }
+    return Image.file(File(src), fit: BoxFit.contain);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _bgColor,
+      builder: (_, __) => Scaffold(
+        backgroundColor: _bgColor.value,
+        body: Stack(
+          children: [
+            // ── Photos ───────────────────────────────
+            PageView.builder(
+              controller: _pageCtrl,
+              itemCount: widget.photos.length,
+              onPageChanged: (i) {
+                _resetZoom(_current);
+                setState(() => _current = i);
+              },
+              itemBuilder: (_, i) {
+                final ctrl = _transformCtrls[i];
+                return GestureDetector(
+                  onTap: () => _handleTap(i),
+                  child: InteractiveViewer(
+                    transformationController: ctrl,
+                    minScale: 1.0,
+                    maxScale: 4.0,
+                    clipBehavior: Clip.none,
+                    child: Center(child: _buildImage(widget.photos[i])),
+                  ),
+                );
+              },
+            ),
+
+            // ── Close button ─────────────────────────
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: GestureDetector(
+                  onTap: _close,
+                  child: Container(
+                    margin: const EdgeInsets.all(12),
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close_rounded,
+                        color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Dot indicators ───────────────────────
+            if (widget.photos.length > 1)
+              Positioned(
+                bottom: 32, left: 0, right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(widget.photos.length, (i) =>
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: _current == i ? 18 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: _current == i
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    )),
+                ),
+              ),
+
+            // ── Counter ──────────────────────────────
+            if (widget.photos.length > 1)
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Container(
+                    margin: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_current + 1}/${widget.photos.length}',
+                      style: const TextStyle(
+                        color: Colors.white, fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -19,6 +19,8 @@ class EVPost {
   int likesCount;
   final List<Color> gradient;
   final String emoji;
+  /// Firestore’da: gönderiyi oluşturan kullanıcının [FirebaseAuth] uid’si.
+  final String? authorId;
 
   EVPost({
     required this.id,
@@ -33,6 +35,7 @@ class EVPost {
     this.likesCount = 0,
     required this.gradient,
     required this.emoji,
+    this.authorId,
   });
 
   Map<String, dynamic> toFirestore() {
@@ -49,6 +52,7 @@ class EVPost {
       'emoji': emoji,
       'gradientStart': gradient.first.toARGB32(),
       'gradientEnd': gradient.last.toARGB32(),
+      if (authorId != null) 'authorId': authorId,
     };
   }
 
@@ -66,6 +70,7 @@ class EVPost {
       createdAt: (d['createdAt'] as Timestamp).toDate(),
       likesCount: d['likesCount'] ?? 0,
       emoji: d['emoji'] ?? '⚡',
+      authorId: d['authorId'] as String?,
       gradient: [
         Color(d['gradientStart'] ?? 0xFF0D3B1F),
         Color(d['gradientEnd'] ?? 0xFF2DC653),
@@ -142,6 +147,10 @@ class PostStore {
 
   Future<void> addPost(EVPost post) async {
     posts.insert(0, post);
+    if (post.authorId == null) {
+      debugPrint('addPost: Firestore atlandı (authorId yok)');
+      return;
+    }
     try {
       await _db.collection('posts').doc(post.id).set(post.toFirestore());
     } catch (e) {

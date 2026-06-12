@@ -98,7 +98,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   String _name      = 'Ahmet Kaya';
   String _nickname  = '@ahmetkaya_ev';
   String _bio       = 'EV tutkunuyum ⚡ Elektrikli geleceğe inanıyorum 🌍';
-  bool   _hasVehicle = true;
+  final bool   _hasVehicle = true;
 
   @override
   void initState() {
@@ -128,7 +128,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Scaffold(
       backgroundColor: EVColors.background,
       body: NestedScrollView(
-        headerSliverBuilder: (_, __) => [
+        headerSliverBuilder: (_, _) => [
           SliverToBoxAdapter(child: _buildHeader()),
           SliverPersistentHeader(
             pinned: true,
@@ -624,7 +624,7 @@ class _ForumTab extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       itemCount: _kPosts.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (_, i) => _ForumPostCard(post: _kPosts[i]),
     );
   }
@@ -723,7 +723,7 @@ class _ListingsTab extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       itemCount: _kListings.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (_, i) => _MyListingCard(listing: _kListings[i]),
     );
   }
@@ -836,7 +836,7 @@ class _MessagesTab extends StatelessWidget {
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           itemCount: convs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (_, i) => _ConversationCard(conv: convs[i]),
         );
       },

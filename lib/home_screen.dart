@@ -1,16 +1,10 @@
-import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'forum_screen.dart';
-import 'akim_screen.dart';
-import 'story_viewer_screen.dart';
 import 'profile_screen.dart';
-import 'create_story_screen.dart';
 import 'charging_screen.dart';
 import 'ikinci_el_screen.dart';
 import 'bildirim_screen.dart';
-import 'post_store.dart';
 
 // ─────────────────────────────────────────────
 //  COLORS
@@ -196,8 +190,6 @@ const List<PostItem> kPosts = [
     tagText: EVColors.tag2Text,
   ),
 ];
-List<EVPost> get kStorePosts =>
-    PostStore.instance.posts.toList();
 
 // ─────────────────────────────────────────────
 //  BOTTOM NAV ITEMS
@@ -432,7 +424,7 @@ class _NewsCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: news.gradientEnd.withOpacity(0.35),
+              color: news.gradientEnd.withValues(alpha: 0.35),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -447,7 +439,7 @@ class _NewsCard extends StatelessWidget {
                 width: 150, height: 150,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.07),
+                  color: Colors.white.withValues(alpha: 0.07),
                 ),
               ),
             ),
@@ -457,7 +449,7 @@ class _NewsCard extends StatelessWidget {
                 width: 120, height: 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                 ),
               ),
             ),
@@ -473,14 +465,14 @@ class _NewsCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.20),
+                          color: Colors.white.withValues(alpha: 0.20),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(news.icon, size: 12,
-                                color: Colors.white.withOpacity(0.9)),
+                                color: Colors.white.withValues(alpha: 0.9)),
                             const SizedBox(width: 5),
                             Text(news.category, style: const TextStyle(
                               fontSize: 11, fontWeight: FontWeight.w600,
@@ -491,7 +483,7 @@ class _NewsCard extends StatelessWidget {
                       ),
                       const Spacer(),
                       Text(news.readTime, style: TextStyle(
-                        fontSize: 11, color: Colors.white.withOpacity(0.75),
+                        fontSize: 11, color: Colors.white.withValues(alpha: 0.75),
                       )),
                     ],
                   ),
@@ -511,7 +503,7 @@ class _NewsCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 12, color: Colors.white.withOpacity(0.80),
+                      fontSize: 12, color: Colors.white.withValues(alpha: 0.80),
                       height: 1.45,
                     ),
                   ),
@@ -575,7 +567,7 @@ class _PostCard extends StatelessWidget {
           border: Border.all(color: EVColors.border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -692,9 +684,9 @@ class _AvatarCircle extends StatelessWidget {
     return Container(
       width: 36, height: 36,
       decoration: BoxDecoration(
-        color: _color.withOpacity(0.15),
+        color: _color.withValues(alpha: 0.15),
         shape: BoxShape.circle,
-        border: Border.all(color: _color.withOpacity(0.25)),
+        border: Border.all(color: _color.withValues(alpha: 0.25)),
       ),
       child: Center(
         child: Text(initials, style: TextStyle(
@@ -846,621 +838,6 @@ class _BottomNav extends StatelessWidget {
 }
 
 
-// ─────────────────────────────────────────────
-//  STORY BAR — drop this into home_screen.dart
-//  (paste after your existing mock data / before HomeScreen class)
-// ─────────────────────────────────────────────
-
-// ── Model ────────────────────────────────────
-class StoryItem {
-  final String id;
-  final String username;
-  final String initials;
-  final Color avatarColor;
-  final bool isSeen;
-  final bool isOwn; // first "Your Story" item
-
-  const StoryItem({
-    required this.id,
-    required this.username,
-    required this.initials,
-    required this.avatarColor,
-    this.isSeen = false,
-    this.isOwn = false,
-  });
-}
-
-// ── Mock data ────────────────────────────────
-const List<StoryItem> kStories = [
-  StoryItem(
-    id: 'own',
-    username: 'Your Story',
-    initials: 'You',
-    avatarColor: Color(0xFF2DC653),
-    isOwn: true,
-  ),
-  StoryItem(
-    id: 's1',
-    username: 'tesla_alex',
-    initials: 'TA',
-    avatarColor: Color(0xFFCC0000),
-    isSeen: false,
-  ),
-  StoryItem(
-    id: 's2',
-    username: 'ev_priya',
-    initials: 'EP',
-    avatarColor: Color(0xFF378ADD),
-    isSeen: true,
-  ),
-  StoryItem(
-    id: 's3',
-    username: 'ioniq_sam',
-    initials: 'IS',
-    avatarColor: Color(0xFFEF9F27),
-    isSeen: false,
-  ),
-  StoryItem(
-    id: 's4',
-    username: 'togg_sofia',
-    initials: 'TS',
-    avatarColor: Color(0xFF7F77DD),
-    isSeen: false,
-  ),
-  StoryItem(
-    id: 's5',
-    username: 'bmw_jordan',
-    initials: 'BJ',
-    avatarColor: Color(0xFF1C69D4),
-    isSeen: true,
-  ),
-  StoryItem(
-    id: 's6',
-    username: 'porsche_m',
-    initials: 'PM',
-    avatarColor: Color(0xFFAE8753),
-    isSeen: false,
-  ),
-  StoryItem(
-    id: 's7',
-    username: 'renault_k',
-    initials: 'RK',
-    avatarColor: Color(0xFF00C49A),
-    isSeen: true,
-  ),
-];
-
-// ── Main widget ───────────────────────────────
-class _StoryBar extends StatefulWidget {
-  const _StoryBar();
-
-  @override
-  State<_StoryBar> createState() => _StoryBarState();
-}
-
-class _StoryBarState extends State<_StoryBar> {
-  // Track locally which stories have been tapped/seen this session
-  final Set<String> _seenThisSession = {};
-
-  void _onStoryTap(StoryItem story) {
-  if (story.isOwn) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CreateStoryScreen(),
-      ),
-    );
-    return;
-  }
-  setState(() => _seenThisSession.add(story.id));
-  Navigator.push(
-    context,
-    PageRouteBuilder(
-      pageBuilder: (_, __, ___) => StoryViewer(
-        stories: kStoryData,
-        initialIndex: kStoryData
-            .indexWhere((s) => s.id == story.id)
-            .clamp(0, kStoryData.length - 1),
-      ),
-      transitionsBuilder: (_, anim, __, child) =>
-          FadeTransition(opacity: anim, child: child),
-      transitionDuration: const Duration(milliseconds: 250),
-    ),
-  );
-}
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 96,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        scrollDirection: Axis.horizontal,
-        itemCount: kStories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (context, i) {
-          final story = kStories[i];
-          final isSeen = story.isSeen || _seenThisSession.contains(story.id);
-          return _StoryAvatar(
-            story: story,
-            isSeen: isSeen,
-            onTap: () => _onStoryTap(story),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ── Single story avatar ───────────────────────
-class _StoryAvatar extends StatelessWidget {
-  final StoryItem story;
-  final bool isSeen;
-  final VoidCallback onTap;
-
-  const _StoryAvatar({
-    required this.story,
-    required this.isSeen,
-    required this.onTap,
-  });
-
-  // Green gradient stops for unseen stories
-  static const List<Color> _unseenGradient = [
-    Color(0xFF2DC653),
-    Color(0xFF0FA847),
-    Color(0xFFB6EFC5),
-  ];
-
-  // Grey stops for seen stories
-  static const List<Color> _seenGradient = [
-    Color(0xFFD4EBD9),
-    Color(0xFFADC4B4),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: 62,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ── Ring + avatar ─────────────────────────
-            _StoryRing(
-              story: story,
-              isSeen: isSeen,
-              unseenGradient: _unseenGradient,
-              seenGradient: _seenGradient,
-            ),
-            const SizedBox(height: 6),
-            // ── Username label ────────────────────────
-            Text(
-              story.username,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: story.isOwn ? FontWeight.w600 : FontWeight.w500,
-                color: story.isOwn
-                    ? const Color(0xFF2DC653)
-                    : isSeen
-                        ? const Color(0xFFADC4B4)
-                        : const Color(0xFF0D1B12),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Gradient ring painter ─────────────────────
-class _StoryRing extends StatelessWidget {
-  final StoryItem story;
-  final bool isSeen;
-  final List<Color> unseenGradient;
-  final List<Color> seenGradient;
-
-  const _StoryRing({
-    required this.story,
-    required this.isSeen,
-    required this.unseenGradient,
-    required this.seenGradient,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Ring is hidden for "Your Story" (replaced by a plain border + "+" badge)
-    final double ringWidth = story.isOwn ? 0 : 2.0;
-    final double gap = story.isOwn ? 0 : 2.5; // gap between ring and avatar
-
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Gradient / grey ring
-        if (!story.isOwn)
-          CustomPaint(
-            size: const Size(60, 60),
-            painter: _RingPainter(
-              colors: isSeen ? seenGradient : unseenGradient,
-              strokeWidth: ringWidth,
-            ),
-          ),
-
-        // White gap spacer
-        Container(
-          width: 60 - (ringWidth + gap) * 2,
-          height: 60 - (ringWidth + gap) * 2,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF6FBF7), // matches EVColors.background
-            shape: BoxShape.circle,
-          ),
-        ),
-
-        // Actual avatar circle
-        Container(
-          width: story.isOwn ? 58 : 60 - (ringWidth + gap) * 2 - 2,
-          height: story.isOwn ? 58 : 60 - (ringWidth + gap) * 2 - 2,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: story.avatarColor.withOpacity(0.15),
-            border: story.isOwn
-                ? Border.all(
-                    color: const Color(0xFFD4EBD9),
-                    width: 1.5,
-                  )
-                : null,
-          ),
-          child: Center(
-            child: Text(
-              story.initials,
-              style: TextStyle(
-                fontSize: story.isOwn ? 12 : 14,
-                fontWeight: FontWeight.w700,
-                color: story.avatarColor,
-              ),
-            ),
-          ),
-        ),
-
-        // "+" badge for Your Story
-        if (story.isOwn)
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2DC653),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFFF6FBF7),
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF2DC653).withOpacity(0.35),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 13,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// ── Custom painter for gradient ring ─────────
-class _RingPainter extends CustomPainter {
-  final List<Color> colors;
-  final double strokeWidth;
-
-  const _RingPainter({required this.colors, required this.strokeWidth});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(
-      strokeWidth / 2,
-      strokeWidth / 2,
-      size.width - strokeWidth,
-      size.height - strokeWidth,
-    );
-
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..shader = SweepGradient(
-        colors: colors,
-        startAngle: -1.57, // start at top (−π/2)
-        endAngle: 4.71,
-      ).createShader(rect);
-
-    canvas.drawOval(rect, paint);
-  }
-
-  @override
-  bool shouldRepaint(_RingPainter old) =>
-      old.colors != colors || old.strokeWidth != strokeWidth;
-      }
-// ─────────────────────────────────────────────
-//  EV POST CARD
-// ─────────────────────────────────────────────
-class _EVPostCard extends StatefulWidget {
-  final EVPost post;
-  const _EVPostCard({required this.post});
-
-  @override
-  State<_EVPostCard> createState() => _EVPostCardState();
-}
-
-class _EVPostCardState extends State<_EVPostCard> {
-  bool _liked = false;
-
-  String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'Şimdi';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}d önce';
-    if (diff.inHours < 24) return '${diff.inHours}s önce';
-    return '${diff.inDays}g önce';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final post = widget.post;
-    final isCheckin = post.type == PostType.checkin;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-      decoration: BoxDecoration(
-        color: EVColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: EVColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12, offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-
-          // ── Header ──────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-            child: Row(
-              children: [
-                Container(
-                  width: 38, height: 38,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: EVColors.primary.withValues(alpha: 0.15),
-                    border: Border.all(
-                        color: EVColors.primary.withValues(alpha: 0.30)),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      isCheckin
-                          ? Icons.ev_station_rounded
-                          : Icons.person_rounded,
-                      color: EVColors.primary,
-                      size: 18,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isCheckin
-                            ? (post.stationName ?? 'Şarj İstasyonu')
-                            : 'Sen',
-                        style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700,
-                          color: EVColors.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        _timeAgo(post.createdAt),
-                        style: const TextStyle(
-                          fontSize: 11, color: EVColors.textHint,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (isCheckin)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: EVColors.primaryLight,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: EVColors.primary.withValues(alpha: 0.3)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.bolt_rounded,
-                            color: EVColors.primary, size: 12),
-                        SizedBox(width: 3),
-                        Text('Check-in', style: TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w700,
-                          color: EVColors.primary,
-                        )),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          // ── Görsel ──────────────────────────────
-          SizedBox(
-            height: 180,
-            width: double.infinity,
-            child: post.imagePath != null
-                ? Image.file(
-                    File(post.imagePath!),
-                    fit: BoxFit.cover,
-                  )
-                : Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: post.gradient,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                      ),
-                      Center(
-                        child: Text(post.emoji,
-                            style: const TextStyle(fontSize: 56)),
-                      ),
-                      if (isCheckin)
-                        Positioned(
-                          bottom: 12, left: 12, right: 12,
-                          child: Row(
-                            children: [
-                              if (post.connectorType != null)
-                                _OverlayPill(
-                                    label: post.connectorType!,
-                                    icon: Icons.power_rounded),
-                              const SizedBox(width: 6),
-                              if (post.stationPower != null)
-                                _OverlayPill(
-                                    label: '${post.stationPower} kW',
-                                    icon: Icons.bolt_rounded),
-                              const SizedBox(width: 6),
-                              if (post.rating != null)
-                                _OverlayPill(
-                                    label: post.rating!.toStringAsFixed(1),
-                                    icon: Icons.star_rounded),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-          ),
-
-          // ── Caption ──────────────────────────────
-          if (post.caption != null && post.caption!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-              child: Text(
-                post.caption!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13, color: EVColors.textSecondary, height: 1.45,
-                ),
-              ),
-            ),
-
-          // ── Aksiyonlar ───────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: () => setState(() => _liked = !_liked),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _liked
-                            ? Icons.bolt_rounded
-                            : Icons.bolt_outlined,
-                        color: _liked
-                            ? EVColors.primary
-                            : EVColors.textHint,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${post.likesCount + (_liked ? 1 : 0)}',
-                        style: const TextStyle(
-                          fontSize: 12, color: EVColors.textHint,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                const Row(
-                  children: [
-                    Icon(Icons.chat_bubble_outline_rounded,
-                        color: EVColors.textHint, size: 18),
-                    SizedBox(width: 4),
-                    Text('0', style: TextStyle(
-                      fontSize: 12, color: EVColors.textHint,
-                      fontWeight: FontWeight.w500,
-                    )),
-                  ],
-                ),
-                const Spacer(),
-                const Icon(Icons.bookmark_border_rounded,
-                    color: EVColors.textHint, size: 20),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  OVERLAY PILL
-// ─────────────────────────────────────────────
-class _OverlayPill extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  const _OverlayPill({required this.label, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 11),
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(
-            fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600,
-          )),
-        ],
-      ),
-    );
-  }
-// ─────────────────────────────────────────────
-//  NEWS DETAIL SCREEN
-// ─────────────────────────────────────────────
-}
 class NewsDetailScreen extends StatelessWidget {
   final NewsItem news;
   const NewsDetailScreen({super.key, required this.news});

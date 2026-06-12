@@ -315,7 +315,7 @@ class _TopBar extends StatelessWidget {
                     ]),
                   ),
                   Text('EV moments', style: TextStyle(
-                    fontSize: 11, color: Colors.white.withOpacity(0.55),
+                    fontSize: 11, color: Colors.white.withValues(alpha: 0.55),
                     fontWeight: FontWeight.w400,
                   )),
                 ],
@@ -347,7 +347,7 @@ class _ProgressDots extends StatelessWidget {
           decoration: BoxDecoration(
             color: current == i
                 ? const Color(0xFF2DC653)
-                : Colors.white.withOpacity(0.35),
+                : Colors.white.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(2),
           ),
         );
@@ -372,9 +372,9 @@ class _GlassButton extends StatelessWidget {
           child: Container(
             width: 38, height: 38,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.20)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
             ),
             child: Icon(icon, color: Colors.white, size: 16),
           ),
@@ -556,7 +556,7 @@ class _PostBackgroundState extends State<_PostBackground>
                 width: 280, height: 280,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.04),
+                  color: Colors.white.withValues(alpha: 0.04),
                 ),
               ),
             ),
@@ -566,7 +566,7 @@ class _PostBackgroundState extends State<_PostBackground>
                 width: 320, height: 320,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.03),
+                  color: Colors.white.withValues(alpha: 0.03),
                 ),
               ),
             ),
@@ -600,7 +600,7 @@ class _GradientOverlays extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.center,
               colors: [
-                Colors.black.withOpacity(0.55),
+                Colors.black.withValues(alpha: 0.55),
                 Colors.transparent,
               ],
             ),
@@ -613,7 +613,7 @@ class _GradientOverlays extends StatelessWidget {
               begin: Alignment.bottomCenter,
               end: Alignment(0, 0.1),
               colors: [
-                Colors.black.withOpacity(0.80),
+                Colors.black.withValues(alpha: 0.80),
                 Colors.transparent,
               ],
             ),
@@ -715,7 +715,7 @@ class _AvatarButton extends StatelessWidget {
             border: Border.all(color: Colors.white, width: 2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 8, offset: const Offset(0, 3),
               ),
             ],
@@ -771,7 +771,7 @@ class _ActionBtn extends StatelessWidget {
             scaleX: flipHorizontal ? -1 : 1,
             child: Icon(icon, color: iconColor, size: 30,
               shadows: [Shadow(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
                 blurRadius: 8,
               )],
             ),
@@ -780,9 +780,9 @@ class _ActionBtn extends StatelessWidget {
             const SizedBox(height: 4),
             Text(label, style: TextStyle(
               fontSize: 12, fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               shadows: [Shadow(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
                 blurRadius: 4,
               )],
             )),
@@ -819,7 +819,7 @@ class _BottomInfo extends StatelessWidget {
               )),
               const SizedBox(width: 6),
               Text(post.userHandle, style: TextStyle(
-                fontSize: 13, color: Colors.white.withOpacity(0.65),
+                fontSize: 13, color: Colors.white.withValues(alpha: 0.65),
                 shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
               )),
               const SizedBox(width: 8),
@@ -827,10 +827,10 @@ class _BottomInfo extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2DC653).withOpacity(0.25),
+                  color: const Color(0xFF2DC653).withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                      color: const Color(0xFF2DC653).withOpacity(0.5)),
+                      color: const Color(0xFF2DC653).withValues(alpha: 0.5)),
                 ),
                 child: Text('Follow', style: const TextStyle(
                   fontSize: 11, fontWeight: FontWeight.w700,
@@ -870,10 +870,10 @@ class _BottomInfo extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13,
-              color: Colors.white.withOpacity(0.88),
+              color: Colors.white.withValues(alpha: 0.88),
               height: 1.45,
               shadows: [Shadow(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 blurRadius: 6,
               )],
             ),
@@ -883,7 +883,7 @@ class _BottomInfo extends StatelessWidget {
 
           // Time ago
           Text(post.timeAgo, style: TextStyle(
-            fontSize: 11, color: Colors.white.withOpacity(0.45),
+            fontSize: 11, color: Colors.white.withValues(alpha: 0.45),
           )),
         ],
       ),
@@ -910,13 +910,13 @@ class _InfoChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: glassStyle
-                ? const Color(0xFF2DC653).withOpacity(0.20)
-                : Colors.white.withOpacity(0.12),
+                ? const Color(0xFF2DC653).withValues(alpha: 0.20)
+                : Colors.white.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: glassStyle
-                  ? const Color(0xFF2DC653).withOpacity(0.40)
-                  : Colors.white.withOpacity(0.20),
+                  ? const Color(0xFF2DC653).withValues(alpha: 0.40)
+                  : Colors.white.withValues(alpha: 0.20),
             ),
           ),
           child: Row(
@@ -934,7 +934,7 @@ class _InfoChip extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: glassStyle
                         ? const Color(0xFF2DC653)
-                        : Colors.white.withOpacity(0.90),
+                        : Colors.white.withValues(alpha: 0.90),
                   ),
                 ),
               ),
@@ -981,7 +981,7 @@ class _CommentSheet extends StatelessWidget {
                 child: Container(
                   width: 36, height: 4,
                   decoration: BoxDecoration(
-                    color: EVColors.textHint.withOpacity(0.5),
+                    color: EVColors.textHint.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1062,8 +1062,8 @@ class _CommentRow extends StatelessWidget {
             width: 34, height: 34,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _color.withOpacity(0.15),
-              border: Border.all(color: _color.withOpacity(0.30)),
+              color: _color.withValues(alpha: 0.15),
+              border: Border.all(color: _color.withValues(alpha: 0.30)),
             ),
             child: Center(
               child: Text(comment['init'] as String,
@@ -1170,7 +1170,7 @@ class _CommentInput extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: EVColors.primary.withOpacity(0.30),
+                  color: EVColors.primary.withValues(alpha: 0.30),
                   blurRadius: 10, offset: const Offset(0, 4),
                 ),
               ],

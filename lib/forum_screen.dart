@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'forum_detail_screen.dart';
 
 // ─────────────────────────────────────────────
@@ -42,6 +43,7 @@ class ForumBrand {
 class ForumTopic {
   final String id, title, excerpt, authorName, authorInitials;
   final Color authorColor;
+  final String? authorId; // Firestore: konu sahibi (auth uid)
   final String categoryId, brandId, timeAgo, readTime;
   final int replies, views;
   final bool isPinned, isHot;
@@ -50,7 +52,8 @@ class ForumTopic {
   ForumTopic({
     required this.id, required this.title, required this.excerpt,
     required this.authorName, required this.authorInitials,
-    required this.authorColor, required this.categoryId,
+    required this.authorColor, this.authorId,
+    required this.categoryId,
     required this.brandId, required this.timeAgo, required this.readTime,
     required this.replies, required this.views,
     this.isPinned = false, this.isHot = false,
@@ -199,14 +202,7 @@ class _ForumScreenState extends State<ForumScreen> {
   void initState() {
     super.initState();
     _topics = buildTopics();
-    @override
-void initState() {
-  super.initState();
-  _topics = buildTopics();
-  _loadTopicsFromFirestore(); // ← EKLE
-  _searchCtrl.addListener(
-      () => setState(() => _searchQuery = _searchCtrl.text.toLowerCase()));
-}
+    _loadTopicsFromFirestore();
     _searchCtrl.addListener(
         () => setState(() => _searchQuery = _searchCtrl.text.toLowerCase()));
   }
@@ -240,6 +236,7 @@ void initState() {
         views: d['views'] ?? 0,
         isPinned: d['isPinned'] ?? false,
         isHot: d['isHot'] ?? false,
+        authorId: d['authorId'] as String?,
         comments: [],
       );
       if (!_topics.any((t) => t.id == topic.id)) {
@@ -280,51 +277,79 @@ void initState() {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _NewTopicSheet(
-       // SONRA:
-onSubmit: (title, excerpt, categoryId, brandId) async {
-  final newTopic = ForumTopic(
-    id: DateTime.now().millisecondsSinceEpoch.toString(),
-    title: title, excerpt: excerpt,
-    authorName: 'Sen', authorInitials: 'SE',
-    authorColor: EVColors.primary,
-    categoryId: categoryId,
-brandId: brandId,
-    timeAgo: 'Şimdi', readTime: '1 dk',
-    replies: 0, views: 1, comments: [],
-  );
-  setState(() => _topics.insert(0, newTopic));
+        onSubmit: (title, excerpt, categoryId, brandId) async {
+          final uid = FirebaseAuth.instance.currentUser?.uid;
+          if (uid == null) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Konu açmak için giriş yapmalısın.'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
 
-  // Firestore'a kaydet
-  try {
-    await FirebaseFirestore.instance
-        .collection('forum_topics')
-        .doc(newTopic.id)
-        .set({
-      'title': newTopic.title,
-      'excerpt': newTopic.excerpt,
-      'authorName': newTopic.authorName,
-      'authorInitials': newTopic.authorInitials,
-      'categoryId': newTopic.categoryId,
-      'brandId': newTopic.brandId,
-      'replies': 0,
-      'views': 1,
-      'isPinned': false,
-      'isHot': false,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-  } catch (e) {
-    debugPrint('Forum topic save error: $e');
-  }
+          final newTopic = ForumTopic(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            title: title,
+            excerpt: excerpt,
+            authorName: 'Sen',
+            authorInitials: 'SE',
+            authorColor: EVColors.primary,
+            authorId: uid,
+            categoryId: categoryId,
+            brandId: brandId,
+            timeAgo: 'Şimdi',
+            readTime: '1 dk',
+            replies: 0,
+            views: 1,
+            comments: [],
+          );
+          setState(() => _topics.insert(0, newTopic));
 
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: const Text('Konu oluşturuldu! 🎉',
-        style: TextStyle(fontWeight: FontWeight.w600)),
-    backgroundColor: EVColors.primary,
-    behavior: SnackBarBehavior.floating,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    margin: const EdgeInsets.all(16),
-  ));
-},
+          try {
+            await FirebaseFirestore.instance
+                .collection('forum_topics')
+                .doc(newTopic.id)
+                .set({
+              'title': newTopic.title,
+              'excerpt': newTopic.excerpt,
+              'authorName': newTopic.authorName,
+              'authorInitials': newTopic.authorInitials,
+              'authorId': uid,
+              'categoryId': newTopic.categoryId,
+              'brandId': newTopic.brandId,
+              'replies': 0,
+              'views': 1,
+              'isPinned': false,
+              'isHot': false,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+          } catch (e) {
+            debugPrint('Forum topic save error: $e');
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Kaydedilemedi: $e'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Konu oluşturuldu! 🎉',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: EVColors.primary,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
       ),
     );
   }
@@ -489,7 +514,7 @@ class _CategoryChips extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
           final cat = categories[i];
           final active = cat.id == activeId;

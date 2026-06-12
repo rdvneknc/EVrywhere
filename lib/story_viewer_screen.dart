@@ -376,7 +376,7 @@ class _StoryBackground extends StatelessWidget {
                 width: 320, height: 320,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                 ),
               ),
             ),
@@ -386,7 +386,7 @@ class _StoryBackground extends StatelessWidget {
                 width: 360, height: 360,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.04),
+                  color: Colors.white.withValues(alpha: 0.04),
                 ),
               ),
             ),
@@ -419,7 +419,7 @@ class _TopGradient extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black.withOpacity(0.65),
+              Colors.black.withValues(alpha: 0.65),
               Colors.transparent,
             ],
           ),
@@ -441,7 +441,7 @@ class _BottomGradient extends StatelessWidget {
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
             colors: [
-              Colors.black.withOpacity(0.80),
+              Colors.black.withValues(alpha: 0.80),
               Colors.transparent,
             ],
           ),
@@ -507,9 +507,9 @@ class _ProgressSegment extends StatelessWidget {
         child: state == _SegmentState.active
             ? AnimatedBuilder(
                 animation: controller,
-                builder: (_, __) => LinearProgressIndicator(
+                builder: (_, _) => LinearProgressIndicator(
                   value: controller.value,
-                  backgroundColor: Colors.white.withOpacity(0.30),
+                  backgroundColor: Colors.white.withValues(alpha: 0.30),
                   valueColor: const AlwaysStoppedAnimation(Colors.white),
                   minHeight: 2.5,
                 ),
@@ -517,7 +517,7 @@ class _ProgressSegment extends StatelessWidget {
             : Container(
                 color: state == _SegmentState.complete
                     ? Colors.white
-                    : Colors.white.withOpacity(0.30),
+                    : Colors.white.withValues(alpha: 0.30),
               ),
       ),
     );
@@ -547,7 +547,7 @@ class _StoryTopBar extends StatelessWidget {
             border: Border.all(color: Colors.white, width: 2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.25),
+                color: Colors.black.withValues(alpha: 0.25),
                 blurRadius: 8, offset: const Offset(0, 2),
               ),
             ],
@@ -577,7 +577,7 @@ class _StoryTopBar extends StatelessWidget {
                 children: [
                   Text(story.timeAgo, style: TextStyle(
                     fontSize: 11,
-                    color: Colors.white.withOpacity(0.65),
+                    color: Colors.white.withValues(alpha: 0.65),
                     shadows: const [Shadow(color: Colors.black45, blurRadius: 4)],
                   )),
                   const SizedBox(width: 6),
@@ -585,13 +585,13 @@ class _StoryTopBar extends StatelessWidget {
                     width: 3, height: 3,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.45),
+                      color: Colors.white.withValues(alpha: 0.45),
                     ),
                   ),
                   const SizedBox(width: 6),
                   Text(story.userHandle, style: TextStyle(
                     fontSize: 11,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                     shadows: const [Shadow(color: Colors.black45, blurRadius: 4)],
                   )),
                 ],
@@ -634,9 +634,9 @@ class _GlassIconButton extends StatelessWidget {
           child: Container(
             width: 36, height: 36,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.20)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
             ),
             child: Icon(icon, color: Colors.white, size: 18),
           ),
@@ -692,10 +692,10 @@ class _StoryCaption extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.white.withOpacity(0.92),
+              color: Colors.white.withValues(alpha: 0.92),
               height: 1.5,
               shadows: [Shadow(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 blurRadius: 8,
               )],
             ),
@@ -731,13 +731,13 @@ class _InfoChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: isAccent
-                ? const Color(0xFF2DC653).withOpacity(0.22)
-                : Colors.white.withOpacity(0.14),
+                ? const Color(0xFF2DC653).withValues(alpha: 0.22)
+                : Colors.white.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isAccent
-                  ? const Color(0xFF2DC653).withOpacity(0.45)
-                  : Colors.white.withOpacity(0.22),
+                  ? const Color(0xFF2DC653).withValues(alpha: 0.45)
+                  : Colors.white.withValues(alpha: 0.22),
             ),
           ),
           child: Row(
@@ -755,7 +755,7 @@ class _InfoChip extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: isAccent
                         ? const Color(0xFF2DC653)
-                        : Colors.white.withOpacity(0.90),
+                        : Colors.white.withValues(alpha: 0.90),
                   ),
                 ),
               ),
@@ -781,9 +781,9 @@ class _ReplyBar extends StatelessWidget {
         child: Container(
           height: 48,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.white.withOpacity(0.22)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
           ),
           child: Row(
             children: [
@@ -793,7 +793,7 @@ class _ReplyBar extends StatelessWidget {
                   'Reply to $username…',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
                 ),
               ),
@@ -810,10 +810,10 @@ class _ReplyBar extends StatelessWidget {
                   child: Container(
                     width: 32, height: 32,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2DC653).withOpacity(0.25),
+                      color: const Color(0xFF2DC653).withValues(alpha: 0.25),
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: const Color(0xFF2DC653).withOpacity(0.45)),
+                          color: const Color(0xFF2DC653).withValues(alpha: 0.45)),
                     ),
                     child: const Icon(Icons.send_rounded,
                         color: Color(0xFF2DC653), size: 15),
@@ -881,7 +881,7 @@ class _TapZoneHintsState extends State<_TapZoneHints>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _opacity,
-      builder: (_, __) => Opacity(
+      builder: (_, _) => Opacity(
         opacity: _opacity.value,
         child: Row(
           children: [

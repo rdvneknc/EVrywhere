@@ -4,7 +4,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
-import 'forum_screen.dart';
 
 
 void main() async {
@@ -70,7 +69,7 @@ class EVLogoIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(size * 0.28),
         boxShadow: [
           BoxShadow(
-            color: EVColors.primary.withOpacity(0.30),
+            color: EVColors.primary.withValues(alpha: 0.30),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -104,7 +103,7 @@ class _ChargePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.12)
+      ..color = Colors.white.withValues(alpha: 0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round;
@@ -170,7 +169,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
         boxShadow: _isFocused
             ? [
                 BoxShadow(
-                  color: EVColors.primary.withOpacity(0.10),
+                  color: EVColors.primary.withValues(alpha: 0.10),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -222,7 +221,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
-                    color: EVColors.textHint.withOpacity(0.3),
+                    color: EVColors.textHint.withValues(alpha: 0.3),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.close,
@@ -339,7 +338,7 @@ class _EVPrimaryButtonState extends State<EVPrimaryButton>
             boxShadow: enabled
                 ? [
                     BoxShadow(
-                      color: EVColors.primary.withOpacity(0.35),
+                      color: EVColors.primary.withValues(alpha: 0.35),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),

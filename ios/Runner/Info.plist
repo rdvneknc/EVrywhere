@@ -72,5 +72,7 @@
 	<string>İlan fotoğrafı çekmek için kamera erişimi gerekiyor.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>İlan fotoğrafı kaydetmek için galeri erişimi gerekiyor.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Yakındaki şarj istasyonlarını göstermek için konumun kullanılır.</string>
 </dict>
 </plist>

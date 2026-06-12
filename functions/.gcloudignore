@@ -1,0 +1,6 @@
+# Deploy paketine .env sokulmasın; üretimde OCM_KEY'i GCP Konsol'dan veya
+# Secret Manager üzerinden verin.
+.env
+.env.*
+node_modules
+.git

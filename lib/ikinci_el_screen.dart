@@ -169,7 +169,7 @@ List<EvListing> _generateListings(String brandId, String model) {
                        'Önden Çekiş','Arkadan İtiş','4x4','Önden Çekiş'];
 
   // Her ilan için 3-5 demo fotoğraf (seed tabanlı picsum)
-  List<String> _mockPhotos(int i) {
+  List<String> mockPhotos(int i) {
     final seeds = [
       [10, 20, 30],
       [41, 51, 61, 71],
@@ -220,7 +220,7 @@ List<EvListing> _generateListings(String brandId, String model) {
       drivetrain: drivetrains[i],
       paintedParts: _mockPainted[i % _mockPainted.length],
       replacedParts: _mockReplaced[i % _mockReplaced.length],
-      photos: _mockPhotos(i),
+      photos: mockPhotos(i),
     );
   });
 }
@@ -1518,9 +1518,9 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     Navigator.of(context).push(PageRouteBuilder(
       opaque: false,
       barrierColor: Colors.transparent,
-      pageBuilder: (_, __, ___) =>
+      pageBuilder: (_, _, _) =>
           _PhotoViewerScreen(photos: photos, initialIndex: index),
-      transitionsBuilder: (_, anim, __, child) =>
+      transitionsBuilder: (_, anim, _, child) =>
           FadeTransition(opacity: anim, child: child),
       transitionDuration: const Duration(milliseconds: 220),
     ));
@@ -3250,7 +3250,7 @@ class _PhotoViewerScreenState extends State<_PhotoViewerScreen>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _bgColor,
-      builder: (_, __) => Scaffold(
+      builder: (_, _) => Scaffold(
         backgroundColor: _bgColor.value,
         body: Stack(
           children: [

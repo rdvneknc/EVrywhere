@@ -1,6 +1,6 @@
 rules_version = '2';
 // EVrywhere — Firestore güvenlik kuralları
-// Dağıtım: firebase deploy --only firestore
+// Dağıtım: firebase deploy --only firestore:rules
 //
 // Koleksiyonlar:
 //   users            — üye profil özeti
@@ -41,20 +41,22 @@ service cloud.firestore {
       return field is string && field.size() <= max;
     }
 
-    function optionalStrLen(field, max) {
-      return !(field is string) || field.size() <= max;
+    // Eksik alan erişimi Firestore’da hata→deny üretir; önce key var mı bak.
+    function optionalStrLen(data, key, max) {
+      return !(key in data)
+          || (data[key] is string && data[key].size() <= max);
     }
 
     match /users/{userId} {
       allow read: if signedIn();
       allow create: if signedIn()
           && request.auth.uid == userId
-          && optionalStrLen(request.resource.data.displayName, 80)
-          && optionalStrLen(request.resource.data.bio, 500);
+          && optionalStrLen(request.resource.data, 'displayName', 80)
+          && optionalStrLen(request.resource.data, 'bio', 500);
       allow update: if signedIn()
           && request.auth.uid == userId
-          && optionalStrLen(request.resource.data.displayName, 80)
-          && optionalStrLen(request.resource.data.bio, 500);
+          && optionalStrLen(request.resource.data, 'displayName', 80)
+          && optionalStrLen(request.resource.data, 'bio', 500);
       allow delete: if false;
 
       match /saved_topics/{topicId} {
@@ -86,8 +88,8 @@ service cloud.firestore {
           && request.resource.data.rating is number
           && request.resource.data.rating >= 1
           && request.resource.data.rating <= 5
-          && optionalStrLen(request.resource.data.text, 1000)
-          && optionalStrLen(request.resource.data.stationName, 200);
+          && optionalStrLen(request.resource.data, 'text', 1000)
+          && optionalStrLen(request.resource.data, 'stationName', 200);
       allow update: if signedIn()
           && resource.data.authorId == request.auth.uid
           && request.resource.data.authorId == resource.data.authorId
@@ -96,7 +98,7 @@ service cloud.firestore {
           && request.resource.data.rating is number
           && request.resource.data.rating >= 1
           && request.resource.data.rating <= 5
-          && optionalStrLen(request.resource.data.text, 1000);
+          && optionalStrLen(request.resource.data, 'text', 1000);
       allow delete: if signedIn()
           && resource.data.authorId == request.auth.uid;
     }
@@ -112,7 +114,7 @@ service cloud.firestore {
           ]
           && strLen(request.resource.data.targetId, 200)
           && strLen(request.resource.data.reason, 500)
-          && optionalStrLen(request.resource.data.targetLabel, 200);
+          && optionalStrLen(request.resource.data, 'targetLabel', 200);
       allow read, update, delete: if false;
     }
 
@@ -120,16 +122,18 @@ service cloud.firestore {
     match /forum_topics/{topicId} {
       allow read: if true;
       allow create: if signedIn()
+          && request.resource.data.keys().hasAll(['authorId', 'title'])
           && request.resource.data.authorId == request.auth.uid
           && strLen(request.resource.data.title, 200)
-          && optionalStrLen(request.resource.data.excerpt, 2000)
-          && optionalStrLen(request.resource.data.photoUrl, 400000);
+          && optionalStrLen(request.resource.data, 'excerpt', 2000)
+          && optionalStrLen(request.resource.data, 'photoUrl', 900000);
       // Yazar düzenleyebilir; üyeler replies/views’i yalnızca ±1 değiştirebilir.
       allow update: if signedIn() && (
           (
             resource.data.authorId == request.auth.uid
-            && optionalStrLen(request.resource.data.title, 200)
-            && optionalStrLen(request.resource.data.excerpt, 2000)
+            && optionalStrLen(request.resource.data, 'title', 200)
+            && optionalStrLen(request.resource.data, 'excerpt', 2000)
+            && optionalStrLen(request.resource.data, 'photoUrl', 900000)
           ) || (
             request.resource.data.diff(resource.data).affectedKeys()
                 .hasOnly(['replies', 'views'])
@@ -150,11 +154,11 @@ service cloud.firestore {
         allow read: if true;
         allow create: if signedIn()
             && request.resource.data.authorId == request.auth.uid
-            && optionalStrLen(request.resource.data.text, 2000)
-            && optionalStrLen(request.resource.data.photoUrl, 400000);
+            && optionalStrLen(request.resource.data, 'text', 2000)
+            && optionalStrLen(request.resource.data, 'photoUrl', 900000);
         allow update: if signedIn()
             && resource.data.authorId == request.auth.uid
-            && optionalStrLen(request.resource.data.text, 2000);
+            && optionalStrLen(request.resource.data, 'text', 2000);
         allow delete: if signedIn() && (
             resource.data.authorId == request.auth.uid ||
             get(/databases/$(database)/documents/forum_topics/$(topicId))
@@ -172,14 +176,14 @@ service cloud.firestore {
           && request.auth.uid in resource.data.participantIds;
 
       allow create: if isParticipantOnCreate()
-          && optionalStrLen(request.resource.data.subject, 200)
-          && optionalStrLen(request.resource.data.lastMessage, 2000)
-          && optionalStrLen(request.resource.data.contextType, 40)
-          && optionalStrLen(request.resource.data.contextId, 200)
-          && optionalStrLen(request.resource.data.contextTitle, 200)
-          && optionalStrLen(request.resource.data.contextSubtitle, 200)
-          && optionalStrLen(request.resource.data.contextImage, 400000)
-          && optionalStrLen(request.resource.data.contextHref, 400);
+          && optionalStrLen(request.resource.data, 'subject', 200)
+          && optionalStrLen(request.resource.data, 'lastMessage', 2000)
+          && optionalStrLen(request.resource.data, 'contextType', 40)
+          && optionalStrLen(request.resource.data, 'contextId', 200)
+          && optionalStrLen(request.resource.data, 'contextTitle', 200)
+          && optionalStrLen(request.resource.data, 'contextSubtitle', 200)
+          && optionalStrLen(request.resource.data, 'contextImage', 900000)
+          && optionalStrLen(request.resource.data, 'contextHref', 400);
       allow update: if isParticipant()
           && isParticipantSameOnUpdate()
           && request.resource.data.diff(resource.data).affectedKeys()
@@ -188,14 +192,14 @@ service cloud.firestore {
                 'contextType', 'contextId', 'contextTitle', 'contextSubtitle',
                 'contextImage', 'contextHref'
               ])
-          && optionalStrLen(request.resource.data.lastMessage, 2000)
-          && optionalStrLen(request.resource.data.subject, 200)
-          && optionalStrLen(request.resource.data.contextType, 40)
-          && optionalStrLen(request.resource.data.contextId, 200)
-          && optionalStrLen(request.resource.data.contextTitle, 200)
-          && optionalStrLen(request.resource.data.contextSubtitle, 200)
-          && optionalStrLen(request.resource.data.contextImage, 400000)
-          && optionalStrLen(request.resource.data.contextHref, 400);
+          && optionalStrLen(request.resource.data, 'lastMessage', 2000)
+          && optionalStrLen(request.resource.data, 'subject', 200)
+          && optionalStrLen(request.resource.data, 'contextType', 40)
+          && optionalStrLen(request.resource.data, 'contextId', 200)
+          && optionalStrLen(request.resource.data, 'contextTitle', 200)
+          && optionalStrLen(request.resource.data, 'contextSubtitle', 200)
+          && optionalStrLen(request.resource.data, 'contextImage', 900000)
+          && optionalStrLen(request.resource.data, 'contextHref', 400);
       allow delete: if false;
 
       match /messages/{messageId} {
@@ -216,16 +220,16 @@ service cloud.firestore {
       allow create: if signedIn()
           && request.resource.data.keys().hasAll(['sellerUserId'])
           && request.resource.data.sellerUserId == request.auth.uid
-          && optionalStrLen(request.resource.data.description, 3000)
-          && optionalStrLen(request.resource.data.model, 120)
-          && optionalStrLen(request.resource.data.location, 80)
-          && optionalStrLen(request.resource.data.coverPhoto, 400000);
+          && optionalStrLen(request.resource.data, 'description', 3000)
+          && optionalStrLen(request.resource.data, 'model', 120)
+          && optionalStrLen(request.resource.data, 'location', 80)
+          && optionalStrLen(request.resource.data, 'coverPhoto', 900000);
       allow update: if signedIn()
           && resource.data.sellerUserId == request.auth.uid
           && request.resource.data.sellerUserId == resource.data.sellerUserId
-          && optionalStrLen(request.resource.data.description, 3000)
-          && optionalStrLen(request.resource.data.location, 80)
-          && optionalStrLen(request.resource.data.coverPhoto, 400000);
+          && optionalStrLen(request.resource.data, 'description', 3000)
+          && optionalStrLen(request.resource.data, 'location', 80)
+          && optionalStrLen(request.resource.data, 'coverPhoto', 900000);
       allow delete: if signedIn()
           && resource.data.sellerUserId == request.auth.uid;
 
@@ -235,7 +239,7 @@ service cloud.firestore {
             && request.resource.data.sellerUserId == request.auth.uid
             && get(/databases/$(database)/documents/listings/$(listingId))
                 .data.sellerUserId == request.auth.uid
-            && optionalStrLen(request.resource.data.dataUri, 900000);
+            && optionalStrLen(request.resource.data, 'dataUri', 900000);
         allow update, delete: if signedIn()
             && resource.data.sellerUserId == request.auth.uid
             && get(/databases/$(database)/documents/listings/$(listingId))

@@ -2,32 +2,270 @@ rules_version = '2';
 // EVrywhere — Firestore güvenlik kuralları
 // Dağıtım: firebase deploy --only firestore
 //
-// Koleksiyonlar (mevcut istemci kodu):
-//   posts          — post_store / şarj akışı
-//   forum_topics   — forum ekranı
+// Koleksiyonlar:
+//   users            — üye profil özeti
+//   users/*/saved_topics — kaydedilen forum konuları
+//   posts            — şarj istasyonu yorum/puan
+//   reports          — şikayetler
+//   users/*/blocked  — engellenen üyeler
+//   forum_topics     — forum konuları
+//   forum_topics/*/comments — konu yorumları
+//   conversations    — üyeler arası DM
+//   conversations/*/messages
+//   listings         — 2. el ilanları (kapak Firestore’da; fotolar listings/*/photos)
+//   notifications    — kullanıcı bildirimleri (forum yanıtı, mesaj)
 //
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isParticipant() {
+      return signedIn() && request.auth.uid in resource.data.participantIds;
+    }
+
+    function isParticipantOnCreate() {
+      return signedIn()
+          && request.auth.uid in request.resource.data.participantIds
+          && request.resource.data.participantIds.size() == 2;
+    }
+
+    function isParticipantSameOnUpdate() {
+      return request.resource.data.participantIds == resource.data.participantIds
+          && request.resource.data.participants == resource.data.participants;
+    }
+
+    function strLen(field, max) {
+      return field is string && field.size() <= max;
+    }
+
+    function optionalStrLen(field, max) {
+      return !(field is string) || field.size() <= max;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+          && request.auth.uid == userId
+          && optionalStrLen(request.resource.data.displayName, 80)
+          && optionalStrLen(request.resource.data.bio, 500);
+      allow update: if signedIn()
+          && request.auth.uid == userId
+          && optionalStrLen(request.resource.data.displayName, 80)
+          && optionalStrLen(request.resource.data.bio, 500);
+      allow delete: if false;
+
+      match /saved_topics/{topicId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
+
+      match /blocked/{blockedUid} {
+        allow read: if signedIn() && request.auth.uid == userId;
+        allow create, update: if signedIn()
+            && request.auth.uid == userId
+            && blockedUid != request.auth.uid;
+        allow delete: if signedIn() && request.auth.uid == userId;
+      }
+    }
+
+    // Collection group: yanıt sayısı sorgusu
+    match /{path=**}/comments/{commentId} {
+      allow read: if signedIn();
+    }
+
     match /posts/{postId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-          && request.resource.data.authorId == request.auth.uid;
-      allow update, delete: if request.auth != null
+      allow read: if signedIn();
+      allow create: if signedIn()
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.type == 'charging_review'
+          && request.resource.data.keys().hasAll([
+            'type', 'stationOcmId', 'authorId', 'rating', 'createdAt'
+          ])
+          && request.resource.data.rating is number
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && optionalStrLen(request.resource.data.text, 1000)
+          && optionalStrLen(request.resource.data.stationName, 200);
+      allow update: if signedIn()
+          && resource.data.authorId == request.auth.uid
+          && request.resource.data.authorId == resource.data.authorId
+          && request.resource.data.type == resource.data.type
+          && request.resource.data.stationOcmId == resource.data.stationOcmId
+          && request.resource.data.rating is number
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && optionalStrLen(request.resource.data.text, 1000);
+      allow delete: if signedIn()
           && resource.data.authorId == request.auth.uid;
     }
 
-    // Yeni konular: authorId zorunlu ve giriş yapan kullanıcıyla aynı olmalı.
-    // Eski dokümanlarda authorId yoksa güncelleme/silme kurallı geçmez (isteğe bağlı migrasyon).
+    match /reports/{reportId} {
+      allow create: if signedIn()
+          && request.resource.data.reporterId == request.auth.uid
+          && request.resource.data.keys().hasAll([
+            'reporterId', 'targetType', 'targetId', 'reason', 'createdAt'
+          ])
+          && request.resource.data.targetType in [
+            'user', 'listing', 'topic', 'comment', 'post'
+          ]
+          && strLen(request.resource.data.targetId, 200)
+          && strLen(request.resource.data.reason, 500)
+          && optionalStrLen(request.resource.data.targetLabel, 200);
+      allow read, update, delete: if false;
+    }
+
+    // Forum: herkes okuyabilir; yazma/güncelleme üye gerekir.
     match /forum_topics/{topicId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-          && request.resource.data.authorId == request.auth.uid;
-      allow update, delete: if request.auth != null
+      allow read: if true;
+      allow create: if signedIn()
+          && request.resource.data.authorId == request.auth.uid
+          && strLen(request.resource.data.title, 200)
+          && optionalStrLen(request.resource.data.excerpt, 2000)
+          && optionalStrLen(request.resource.data.photoUrl, 400000);
+      // Yazar düzenleyebilir; üyeler replies/views’i yalnızca ±1 değiştirebilir.
+      allow update: if signedIn() && (
+          (
+            resource.data.authorId == request.auth.uid
+            && optionalStrLen(request.resource.data.title, 200)
+            && optionalStrLen(request.resource.data.excerpt, 2000)
+          ) || (
+            request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['replies', 'views'])
+            && request.resource.data.replies is number
+            && request.resource.data.views is number
+            && request.resource.data.replies >= 0
+            && request.resource.data.views >= 0
+            && request.resource.data.replies <= resource.data.replies + 1
+            && request.resource.data.replies >= resource.data.replies - 1
+            && request.resource.data.views <= resource.data.views + 1
+            && request.resource.data.views >= resource.data.views
+          )
+      );
+      allow delete: if signedIn()
           && resource.data.authorId == request.auth.uid;
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if signedIn()
+            && request.resource.data.authorId == request.auth.uid
+            && optionalStrLen(request.resource.data.text, 2000)
+            && optionalStrLen(request.resource.data.photoUrl, 400000);
+        allow update: if signedIn()
+            && resource.data.authorId == request.auth.uid
+            && optionalStrLen(request.resource.data.text, 2000);
+        allow delete: if signedIn() && (
+            resource.data.authorId == request.auth.uid ||
+            get(/databases/$(database)/documents/forum_topics/$(topicId))
+                .data.authorId == request.auth.uid
+        );
+      }
     }
 
-    // Gelecek: ikinci el ilanlar, yorum alt koleksiyonları, DM
-    // match /listings/{listingId} { ... }
+    match /conversations/{conversationId} {
+      allow get: if signedIn() && (
+          !exists(/databases/$(database)/documents/conversations/$(conversationId))
+          || request.auth.uid in resource.data.participantIds
+      );
+      allow list: if signedIn()
+          && request.auth.uid in resource.data.participantIds;
+
+      allow create: if isParticipantOnCreate()
+          && optionalStrLen(request.resource.data.subject, 200)
+          && optionalStrLen(request.resource.data.lastMessage, 2000);
+      allow update: if isParticipant()
+          && isParticipantSameOnUpdate()
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'unread', 'subject'])
+          && optionalStrLen(request.resource.data.lastMessage, 2000)
+          && optionalStrLen(request.resource.data.subject, 200);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if signedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+        allow create: if signedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+            && request.resource.data.senderId == request.auth.uid
+            && request.resource.data.keys().hasAll(['text', 'senderId', 'createdAt'])
+            && strLen(request.resource.data.text, 2000);
+        allow update, delete: if false;
+      }
+    }
+
+    // İlanlar: herkes okuyabilir; yazma/düzenleme satıcıya ait.
+    match /listings/{listingId} {
+      allow read: if true;
+      allow create: if signedIn()
+          && request.resource.data.keys().hasAll(['sellerUserId'])
+          && request.resource.data.sellerUserId == request.auth.uid
+          && optionalStrLen(request.resource.data.description, 3000)
+          && optionalStrLen(request.resource.data.model, 120)
+          && optionalStrLen(request.resource.data.location, 80)
+          && optionalStrLen(request.resource.data.coverPhoto, 400000);
+      allow update: if signedIn()
+          && resource.data.sellerUserId == request.auth.uid
+          && request.resource.data.sellerUserId == resource.data.sellerUserId
+          && optionalStrLen(request.resource.data.description, 3000)
+          && optionalStrLen(request.resource.data.location, 80)
+          && optionalStrLen(request.resource.data.coverPhoto, 400000);
+      allow delete: if signedIn()
+          && resource.data.sellerUserId == request.auth.uid;
+
+      match /photos/{photoId} {
+        allow read: if true;
+        allow create: if signedIn()
+            && request.resource.data.sellerUserId == request.auth.uid
+            && get(/databases/$(database)/documents/listings/$(listingId))
+                .data.sellerUserId == request.auth.uid
+            && optionalStrLen(request.resource.data.dataUri, 900000);
+        allow update, delete: if signedIn()
+            && resource.data.sellerUserId == request.auth.uid
+            && get(/databases/$(database)/documents/listings/$(listingId))
+                .data.sellerUserId == request.auth.uid;
+      }
+    }
+
+    // Bildirimler: forum → sadece konu yazarına; message → sohbet katılımcısına
+    match /notifications/{notifId} {
+      allow read: if signedIn()
+          && resource.data.userId == request.auth.uid;
+      allow create: if signedIn()
+          && request.resource.data.keys().hasAll([
+            'userId', 'type', 'title', 'body', 'isRead', 'actorId'
+          ])
+          && request.resource.data.actorId == request.auth.uid
+          && request.resource.data.isRead == false
+          && strLen(request.resource.data.title, 120)
+          && strLen(request.resource.data.body, 500)
+          && (
+            (
+              request.resource.data.type == 'forum'
+              && request.resource.data.userId != request.auth.uid
+              && request.resource.data.topicId is string
+              && get(/databases/$(database)/documents/forum_topics/$(request.resource.data.topicId))
+                  .data.authorId == request.resource.data.userId
+            ) || (
+              request.resource.data.type == 'message'
+              && request.resource.data.userId != request.auth.uid
+              && request.resource.data.conversationId is string
+              && request.auth.uid in get(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId))
+                  .data.participantIds
+              && request.resource.data.userId in get(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId))
+                  .data.participantIds
+            ) || (
+              request.resource.data.type in ['system', 'priceDown', 'priceUp']
+              && request.resource.data.userId == request.auth.uid
+            )
+          );
+      // Okundu işaretleme / silme — sadece sahip; isRead dışında alan değişmesin
+      allow update: if signedIn()
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['isRead']);
+      allow delete: if signedIn()
+          && resource.data.userId == request.auth.uid;
+    }
   }
 }

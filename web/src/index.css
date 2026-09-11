@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --color-ev-primary: #2dc653;
+  --color-ev-primary-dark: #1a8c40;
+  --color-ev-primary-light: #e8f9ed;
+  --color-ev-primary-mid: #b6efc5;
+  --color-ev-bg: #f6fbf7;
+  --color-ev-surface: #ffffff;
+  --color-ev-text: #0d1b12;
+  --color-ev-muted: #5a7264;
+  --color-ev-hint: #adc4b4;
+  --color-ev-border: #d4ebd9;
+  --color-ev-divider: #e8f2ea;
+  --color-ev-ink: #0d1b12;
+}
+
+html.dark {
+  color-scheme: dark;
+  --color-ev-primary: #22c55e;
+  --color-ev-primary-dark: #16a34a;
+  --color-ev-primary-light: #12261a;
+  --color-ev-primary-mid: #1a3d28;
+  --color-ev-bg: #0b0f14;
+  --color-ev-surface: #141a22;
+  --color-ev-text: #f1f5f9;
+  --color-ev-muted: #94a3b8;
+  --color-ev-hint: #64748b;
+  --color-ev-border: #243041;
+  --color-ev-divider: #1a222d;
+  --color-ev-ink: #070a0e;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ev-text);
+  background: var(--color-ev-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Leaflet popups follow theme */
+.leaflet-container {
+  background: var(--color-ev-bg);
+  font-family: var(--font-sans);
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--color-ev-surface);
+  color: var(--color-ev-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.leaflet-popup-content {
+  color: var(--color-ev-text);
+  margin: 0.65rem 0.85rem;
+}
+
+.leaflet-popup-close-button {
+  color: var(--color-ev-muted) !important;
+}
+
+.leaflet-control-attribution {
+  background: color-mix(in srgb, var(--color-ev-surface) 88%, transparent) !important;
+  color: var(--color-ev-muted) !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--color-ev-primary) !important;
+}
+
+.leaflet-bar a {
+  background: var(--color-ev-surface) !important;
+  color: var(--color-ev-text) !important;
+  border-bottom-color: var(--color-ev-border) !important;
+}
+
+.leaflet-bar a:hover {
+  background: var(--color-ev-bg) !important;
+}
+
+.filter-input {
+  border: 1px solid var(--color-ev-border);
+  background: var(--color-ev-surface);
+  padding: 0.4rem 0.55rem;
+  font-size: 0.8rem;
+  color: var(--color-ev-text);
+  outline: none;
+  width: 100%;
+}
+
+.filter-input:focus {
+  border-color: var(--color-ev-primary);
+}
+
+.filter-input::placeholder {
+  color: var(--color-ev-hint);
+}

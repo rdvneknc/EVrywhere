@@ -1,0 +1,568 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { EVColors } from '../theme/colors';
+import { RootStackParamList } from '../navigation/types';
+import { hexWithAlpha } from '../data/forum';
+import { useAuth } from '../auth/AuthContext';
+import { openOrCreateConversation } from '../api/messaging';
+import {
+  UserPublicProfile,
+  fetchUserPublicProfile,
+  formatJoinDate,
+} from '../api/users';
+import {
+  blockUser,
+  fetchBlockedUserIds,
+  unblockUser,
+} from '../api/moderation';
+import { promptReport } from '../lib/reportPrompt';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
+
+export function UserProfileScreen({ navigation, route }: Props) {
+  const { userId, name, initials, color, contextTitle } = route.params;
+  const { user } = useAuth();
+  const [opening, setOpening] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<UserPublicProfile | null>(null);
+  const [blocked, setBlocked] = useState(false);
+  const isSelf = user?.uid === userId;
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    void fetchUserPublicProfile(userId, { name, initials, color })
+      .then((p) => {
+        if (alive) setProfile(p);
+      })
+      .catch(() => {
+        if (alive) {
+          setProfile({
+            userId,
+            displayName: name,
+            initials,
+            color,
+            bio: '',
+            createdAt: null,
+            topicCount: 0,
+            replyCount: 0,
+            listingCount: 0,
+            garage: null,
+          });
+        }
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [userId, name, initials, color]);
+
+  useEffect(() => {
+    if (!user || isSelf) {
+      setBlocked(false);
+      return;
+    }
+    let alive = true;
+    void fetchBlockedUserIds(user.uid).then((ids) => {
+      if (alive) setBlocked(ids.includes(userId));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [user, userId, isSelf]);
+
+  const displayName = profile?.displayName ?? name;
+  const displayInitials = profile?.initials ?? initials;
+  const displayColor = profile?.color ?? color;
+
+  const startChat = async () => {
+    if (!user) {
+      Alert.alert('Giriş gerekli', 'Mesaj göndermek için giriş yapmalısın.');
+      return;
+    }
+    if (isSelf) {
+      Alert.alert('Bu sensin', 'Kendine mesaj gönderemezsin.');
+      return;
+    }
+    if (blocked) {
+      Alert.alert('Engelli', 'Engellediğin üyeye mesaj gönderemezsin.');
+      return;
+    }
+    if (opening) return;
+    setOpening(true);
+    try {
+      const conversationId = await openOrCreateConversation(
+        user,
+        {
+          userId,
+          name: displayName,
+          initials: displayInitials,
+          color: displayColor,
+        },
+        contextTitle ? `Konu: ${contextTitle}` : 'Direkt mesaj',
+      );
+      navigation.replace('Chat', { conversationId });
+    } catch (e) {
+      Alert.alert(
+        'Mesaj açılamadı',
+        e instanceof Error ? e.message : 'Tekrar dene.',
+      );
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  const toggleBlock = () => {
+    if (!user || isSelf) return;
+    if (blocked) {
+      void unblockUser(user.uid, userId)
+        .then(() => {
+          setBlocked(false);
+          Alert.alert('Engel kaldırıldı');
+        })
+        .catch((e) =>
+          Alert.alert(
+            'İşlem başarısız',
+            e instanceof Error ? e.message : 'Tekrar dene.',
+          ),
+        );
+      return;
+    }
+    Alert.alert(
+      'Engelle',
+      `${displayName} engellensin mi? Mesaj listesinde gizlenir.`,
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Engelle',
+          style: 'destructive',
+          onPress: () => {
+            void blockUser(user.uid, userId)
+              .then(() => {
+                setBlocked(true);
+                Alert.alert('Engellendi');
+              })
+              .catch((e) =>
+                Alert.alert(
+                  'İşlem başarısız',
+                  e instanceof Error ? e.message : 'Tekrar dene.',
+                ),
+              );
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <View style={styles.topBar}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
+          <Ionicons
+            name="chevron-back"
+            size={22}
+            color={EVColors.textPrimary}
+          />
+        </Pressable>
+        <Text style={styles.topTitle}>Üye profili</Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.body}>
+        <View
+          style={[
+            styles.avatar,
+            {
+              backgroundColor: hexWithAlpha(displayColor, 0.15),
+              borderColor: hexWithAlpha(displayColor, 0.35),
+            },
+          ]}
+        >
+          <Text style={[styles.avatarText, { color: displayColor }]}>
+            {displayInitials}
+          </Text>
+        </View>
+        <Text style={styles.name}>{displayName}</Text>
+        <View style={styles.badge}>
+          <Ionicons name="flash" size={12} color={EVColors.primary} />
+          <Text style={styles.badgeText}>EV Sürücüsü</Text>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator
+            color={EVColors.primary}
+            style={{ marginTop: 28 }}
+          />
+        ) : (
+          <>
+            {profile?.bio ? (
+              <Text style={styles.bio}>{profile.bio}</Text>
+            ) : null}
+
+            {profile?.garage ? (
+              <View style={styles.garageChip}>
+                <Text style={{ fontSize: 16 }}>
+                  {profile.garage.emoji || '⚡'}
+                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.garageTitle}>
+                    {profile.garage.brand} {profile.garage.model}
+                  </Text>
+                  <Text style={styles.garageMeta}>
+                    {[
+                      profile.garage.year,
+                      profile.garage.km ? `${profile.garage.km} km` : '',
+                      profile.garage.batteryHealth,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || 'Garaj'}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            <View style={styles.statsCard}>
+              <Stat
+                icon="calendar-outline"
+                label="Katılım"
+                value={formatJoinDate(profile?.createdAt ?? null)}
+              />
+              <View style={styles.statDiv} />
+              <Stat
+                icon="document-text-outline"
+                label="Konu"
+                value={String(profile?.topicCount ?? 0)}
+                onPress={() =>
+                  navigation.navigate('UserTopics', {
+                    userId,
+                    name: displayName,
+                  })
+                }
+              />
+              <View style={styles.statDiv} />
+              <Stat
+                icon="chatbubbles-outline"
+                label="Yanıt"
+                value={String(profile?.replyCount ?? 0)}
+              />
+            </View>
+
+            <View style={styles.listingStatRow}>
+              <Ionicons
+                name="swap-horizontal"
+                size={16}
+                color={EVColors.primary}
+              />
+              <Text style={styles.listingStatText}>
+                {profile?.listingCount ?? 0} aktif 2. el ilanı
+              </Text>
+            </View>
+
+            {contextTitle ? (
+              <Text style={styles.context} numberOfLines={2}>
+                Bu profilden: {contextTitle}
+              </Text>
+            ) : null}
+          </>
+        )}
+
+        {!isSelf ? (
+          <>
+            <Pressable
+              style={[
+                styles.msgBtn,
+                (opening || blocked) && { opacity: 0.75 },
+              ]}
+              onPress={() => void startChat()}
+              disabled={opening || blocked}
+            >
+              {opening ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="chatbubble-ellipses"
+                    size={18}
+                    color="#fff"
+                  />
+                  <Text style={styles.msgLabel}>
+                    {blocked ? 'Engelli üye' : 'Mesaj gönder'}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+            {user ? (
+              <View style={styles.moderationRow}>
+                <Pressable style={styles.modBtn} onPress={toggleBlock}>
+                  <Ionicons
+                    name={blocked ? 'lock-open-outline' : 'ban-outline'}
+                    size={16}
+                    color={blocked ? EVColors.primary : EVColors.error}
+                  />
+                  <Text
+                    style={[
+                      styles.modBtnText,
+                      {
+                        color: blocked ? EVColors.primary : EVColors.error,
+                      },
+                    ]}
+                  >
+                    {blocked ? 'Engeli kaldır' : 'Engelle'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.modBtn}
+                  onPress={() =>
+                    promptReport({
+                      reporterId: user.uid,
+                      targetType: 'user',
+                      targetId: userId,
+                      targetLabel: displayName,
+                    })
+                  }
+                >
+                  <Ionicons
+                    name="flag-outline"
+                    size={16}
+                    color={EVColors.textHint}
+                  />
+                  <Text style={[styles.modBtnText, { color: EVColors.textHint }]}>
+                    Şikayet et
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <Text style={styles.selfHint}>Bu senin profilin</Text>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function Stat({
+  icon,
+  label,
+  value,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  onPress?: () => void;
+}) {
+  const content = (
+    <>
+      <Ionicons name={icon} size={16} color={EVColors.primary} />
+      <Text style={styles.statValue} numberOfLines={2}>
+        {value}
+      </Text>
+      <Text
+        style={[
+          styles.statLabel,
+          onPress ? { color: EVColors.primary, fontWeight: '600' } : null,
+        ]}
+      >
+        {label}
+        {onPress ? ' ›' : ''}
+      </Text>
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable style={styles.statCol} onPress={onPress}>
+        {content}
+      </Pressable>
+    );
+  }
+
+  return <View style={styles.statCol}>{content}</View>;
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: EVColors.background },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  topTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: EVColors.textPrimary,
+  },
+  body: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 40,
+  },
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { fontSize: 32, fontWeight: '800' },
+  name: {
+    marginTop: 16,
+    fontSize: 24,
+    fontWeight: '800',
+    color: EVColors.textPrimary,
+    letterSpacing: -0.4,
+  },
+  badge: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: EVColors.primaryLight,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: EVColors.primary,
+  },
+  bio: {
+    marginTop: 14,
+    fontSize: 14,
+    color: EVColors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 8,
+  },
+  garageChip: {
+    marginTop: 16,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: EVColors.surface,
+    borderWidth: 1,
+    borderColor: EVColors.border,
+  },
+  garageTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: EVColors.textPrimary,
+  },
+  garageMeta: {
+    marginTop: 2,
+    fontSize: 12,
+    color: EVColors.textHint,
+  },
+  statsCard: {
+    marginTop: 24,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    backgroundColor: EVColors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: EVColors.border,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+  },
+  listingStatRow: {
+    marginTop: 12,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: EVColors.primaryLight,
+  },
+  listingStatText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: EVColors.primary,
+  },
+  statCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
+  },
+  statDiv: {
+    width: 1,
+    backgroundColor: EVColors.divider,
+    marginVertical: 4,
+  },
+  statValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: EVColors.textPrimary,
+    textAlign: 'center',
+  },
+  statLabel: {
+    fontSize: 11,
+    color: EVColors.textHint,
+    fontWeight: '500',
+  },
+  context: {
+    marginTop: 16,
+    fontSize: 13,
+    color: EVColors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  msgBtn: {
+    marginTop: 28,
+    minWidth: 200,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: EVColors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+  },
+  msgLabel: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  moderationRow: {
+    marginTop: 14,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  modBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  modBtnText: { fontSize: 13, fontWeight: '600' },
+  selfHint: {
+    marginTop: 28,
+    fontSize: 14,
+    color: EVColors.textHint,
+  },
+});

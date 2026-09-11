@@ -29,14 +29,17 @@ import {
 import {
   getBlockRelation,
   messageForBlockRelation,
+  unblockUser,
   type BlockRelation,
 } from '../api/moderation';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
 export function ChatScreen({ navigation, route }: Props) {
   const { conversationId } = route.params;
   const { user } = useAuth();
+  const { blockedIds, blockedByIds } = useBlockLists();
   const [messages, setMessages] = useState<ChatMessageDoc[]>([]);
   const [peer, setPeer] = useState<PeerProfile | null>(null);
   const [subject, setSubject] = useState('Direkt mesaj');
@@ -44,11 +47,19 @@ export function ChatScreen({ navigation, route }: Props) {
   const [missing, setMissing] = useState(false);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [unblocking, setUnblocking] = useState(false);
   const [blockRelation, setBlockRelation] = useState<BlockRelation>('none');
   const scrollRef = useRef<ScrollView>(null);
 
   const blockMessage = messageForBlockRelation(blockRelation);
   const messagingLocked = blockRelation !== 'none';
+  const iBlocked =
+    blockRelation === 'blocked' || blockRelation === 'mutual';
+
+  const refreshRelation = (peerId: string) => {
+    if (!user) return;
+    void getBlockRelation(user.uid, peerId).then(setBlockRelation);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -64,7 +75,7 @@ export function ChatScreen({ navigation, route }: Props) {
         setPeer(meta.peer);
         setSubject(meta.subject);
         setMissing(false);
-        void getBlockRelation(user.uid, meta.peer.userId).then(setBlockRelation);
+        refreshRelation(meta.peer.userId);
       },
     );
     const unsubMsgs = subscribeConversationMessages(
@@ -83,6 +94,11 @@ export function ChatScreen({ navigation, route }: Props) {
     };
   }, [conversationId, user]);
 
+  useEffect(() => {
+    if (!user || !peer?.userId) return;
+    refreshRelation(peer.userId);
+  }, [user?.uid, peer?.userId, blockedIds, blockedByIds]);
+
   const send = async () => {
     const t = text.trim();
     if (!t || !user || sending || messagingLocked) return;
@@ -92,13 +108,31 @@ export function ChatScreen({ navigation, route }: Props) {
       setText('');
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (e) {
-      Alert.alert(
-        'Gönderilemedi',
-        e instanceof Error ? e.message : 'Tekrar dene.',
-      );
+      const msg = e instanceof Error ? e.message : 'Tekrar dene.';
+      Alert.alert('Gönderilemedi', msg);
+      if (peer?.userId) refreshRelation(peer.userId);
     } finally {
       setSending(false);
     }
+  };
+
+  const onUnblock = () => {
+    if (!user || !peer || unblocking) return;
+    setUnblocking(true);
+    void unblockUser(user.uid, peer.userId)
+      .then(() => {
+        setBlockRelation((prev) =>
+          prev === 'mutual' ? 'blocked_by' : 'none',
+        );
+        Alert.alert('Engel kaldırıldı');
+      })
+      .catch((e) =>
+        Alert.alert(
+          'İşlem başarısız',
+          e instanceof Error ? e.message : 'Tekrar dene.',
+        ),
+      )
+      .finally(() => setUnblocking(false));
   };
 
   if (missing) {
@@ -180,7 +214,11 @@ export function ChatScreen({ navigation, route }: Props) {
             }
           >
             {messages.length === 0 ? (
-              <Text style={styles.emptyChat}>İlk mesajı sen yaz.</Text>
+              <Text style={styles.emptyChat}>
+                {messagingLocked
+                  ? 'Mesaj gönderilemez.'
+                  : 'İlk mesajı sen yaz.'}
+              </Text>
             ) : (
               messages.map((m) => (
                 <View
@@ -207,6 +245,19 @@ export function ChatScreen({ navigation, route }: Props) {
         {blockMessage ? (
           <View style={styles.blockBanner}>
             <Text style={styles.blockBannerText}>{blockMessage}</Text>
+            {iBlocked ? (
+              <Pressable
+                style={[styles.unblockBtn, unblocking && { opacity: 0.7 }]}
+                onPress={onUnblock}
+                disabled={unblocking}
+              >
+                {unblocking ? (
+                  <ActivityIndicator color="#92400E" size="small" />
+                ) : (
+                  <Text style={styles.unblockBtnText}>Engeli kaldır</Text>
+                )}
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 
@@ -258,12 +309,27 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 14,
     backgroundColor: '#FEF3C7',
+    gap: 10,
   },
   blockBannerText: {
     textAlign: 'center',
     color: '#92400E',
     fontWeight: '600',
     fontSize: 13,
+  },
+  unblockBtn: {
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  unblockBtnText: {
+    color: '#92400E',
+    fontWeight: '800',
+    fontSize: 12,
   },
   topBar: {
     flexDirection: 'row',
@@ -287,57 +353,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  name: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: EVColors.textPrimary,
-  },
-  listing: { fontSize: 11, color: EVColors.primary, marginTop: 1 },
-  messages: { padding: 16, gap: 8, flexGrow: 1 },
+  name: { fontWeight: '800', fontSize: 15, color: EVColors.textPrimary },
+  listing: { marginTop: 1, fontSize: 12, color: EVColors.textHint },
+  messages: { padding: 14, gap: 8, flexGrow: 1 },
   bubble: {
-    maxWidth: '78%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    maxWidth: '80%',
     borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   bubbleMe: {
     alignSelf: 'flex-end',
     backgroundColor: EVColors.primary,
-    borderBottomRightRadius: 4,
   },
   bubbleThem: {
     alignSelf: 'flex-start',
     backgroundColor: EVColors.surface,
     borderWidth: 1,
     borderColor: EVColors.border,
-    borderBottomLeftRadius: 4,
   },
-  bubbleText: { fontSize: 14, lineHeight: 19 },
+  bubbleText: { fontSize: 14, lineHeight: 20 },
   composer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
+    gap: 8,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: EVColors.divider,
-    backgroundColor: EVColors.surface,
   },
   input: {
     flex: 1,
-    height: 42,
-    borderRadius: 21,
+    minHeight: 42,
+    maxHeight: 100,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: EVColors.border,
-    backgroundColor: EVColors.background,
-    paddingHorizontal: 14,
-    fontSize: 14,
+    backgroundColor: EVColors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     color: EVColors.textPrimary,
   },
   send: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 14,
     backgroundColor: EVColors.primary,
     alignItems: 'center',
     justifyContent: 'center',

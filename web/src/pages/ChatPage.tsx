@@ -15,7 +15,9 @@ import {
   type PeerProfile,
 } from '../api/messaging';
 import {
+  getBlockRelation,
   messageForBlockRelation,
+  unblockUser,
   type BlockRelation,
 } from '../api/moderation';
 import { useBlockLists } from '../hooks/useBlockLists';
@@ -24,19 +26,22 @@ export function ChatPage() {
   const { conversationId = '' } = useParams();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { relationWith } = useBlockLists();
+  const { blockedIds, blockedByIds } = useBlockLists();
   const [messages, setMessages] = useState<ChatMessageDoc[]>([]);
   const [peer, setPeer] = useState<PeerProfile | null>(null);
   const [context, setContext] = useState<ConversationContext | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [unblocking, setUnblocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [blockRelation, setBlockRelation] = useState<BlockRelation>('none');
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const blockRelation: BlockRelation = relationWith(peer?.userId);
   const blockMessage = messageForBlockRelation(blockRelation);
   const messagingLocked = blockRelation !== 'none';
+  const iBlocked =
+    blockRelation === 'blocked' || blockRelation === 'mutual';
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -83,6 +88,20 @@ export function ChatPage() {
   }, [user, conversationId]);
 
   useEffect(() => {
+    if (!user?.uid || !peer?.userId) {
+      setBlockRelation('none');
+      return;
+    }
+    let alive = true;
+    void getBlockRelation(user.uid, peer.userId).then((rel) => {
+      if (alive) setBlockRelation(rel);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [user?.uid, peer?.userId, blockedIds, blockedByIds]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
@@ -98,9 +117,29 @@ export function ChatPage() {
         () => undefined,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gönderilemedi');
+      const msg = err instanceof Error ? err.message : 'Gönderilemedi';
+      setError(msg);
+      if (peer?.userId) {
+        void getBlockRelation(user.uid, peer.userId).then(setBlockRelation);
+      }
     } finally {
       setSending(false);
+    }
+  };
+
+  const onUnblock = async () => {
+    if (!user || !peer?.userId || unblocking) return;
+    setUnblocking(true);
+    setError(null);
+    try {
+      await unblockUser(user.uid, peer.userId);
+      setBlockRelation((prev) =>
+        prev === 'mutual' ? 'blocked_by' : 'none',
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Engel kaldırılamadı');
+    } finally {
+      setUnblocking(false);
     }
   };
 
@@ -168,8 +207,20 @@ export function ChatPage() {
             </div>
 
             {blockMessage ? (
-              <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
-                {blockMessage}
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/60 dark:bg-amber-950/40">
+                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                  {blockMessage}
+                </p>
+                {iBlocked ? (
+                  <button
+                    type="button"
+                    disabled={unblocking}
+                    onClick={() => void onUnblock()}
+                    className="rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-extrabold text-amber-900 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+                  >
+                    {unblocking ? 'Kaldırılıyor…' : 'Engeli kaldır'}
+                  </button>
+                ) : null}
               </div>
             ) : null}
 
@@ -225,9 +276,19 @@ export function ChatPage() {
             ) : null}
 
             {messagingLocked ? (
-              <p className="mt-3 rounded-xl border border-ev-border bg-ev-surface px-4 py-3 text-center text-sm text-ev-muted">
-                {blockMessage}
-              </p>
+              <div className="mt-3 rounded-xl border border-ev-border bg-ev-surface px-4 py-3 text-center">
+                <p className="text-sm text-ev-muted">{blockMessage}</p>
+                {iBlocked ? (
+                  <button
+                    type="button"
+                    disabled={unblocking}
+                    onClick={() => void onUnblock()}
+                    className="mt-2 text-sm font-extrabold text-ev-primary hover:underline disabled:opacity-60"
+                  >
+                    {unblocking ? 'Kaldırılıyor…' : 'Engeli kaldır'}
+                  </button>
+                ) : null}
+              </div>
             ) : (
               <form onSubmit={onSend} className="mt-3 flex gap-2">
                 <input

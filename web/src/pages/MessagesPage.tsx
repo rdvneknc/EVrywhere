@@ -13,7 +13,7 @@ import { useBlockLists } from '../hooks/useBlockLists';
 export function MessagesPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { hiddenIds } = useBlockLists();
+  const { blockedByIds, blockedIds } = useBlockLists();
   const [conversations, setConversations] = useState<ConversationSummary[]>(
     [],
   );
@@ -56,7 +56,10 @@ export function MessagesPage() {
     );
   }
 
-  const visible = conversations.filter((c) => !hiddenIds.has(c.peer.userId));
+  // Beni engelleyenleri gizle; benim engellediklerim listede kalsın (engel kaldırmak için)
+  const visible = conversations.filter(
+    (c) => !blockedByIds.includes(c.peer.userId),
+  );
 
   return (
     <div className="min-h-svh bg-ev-bg">
@@ -101,6 +104,11 @@ export function MessagesPage() {
                         {c.lastMessageAt ? chatTimeAgo(c.lastMessageAt) : ''}
                       </span>
                     </div>
+                    {blockedIds.includes(c.peer.userId) ? (
+                      <div className="mt-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                        Engelledin
+                      </div>
+                    ) : null}
                     {c.context && c.context.type !== 'dm' ? (
                       <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-ev-primary">
                         <span aria-hidden>

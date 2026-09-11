@@ -26,7 +26,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Messages'>;
 
 export function MessagesScreen({ navigation }: Props) {
   const { user } = useAuth();
-  const { hiddenIds } = useBlockLists();
+  const { blockedByIds, blockedIds } = useBlockLists();
   const [conversations, setConversations] = useState<ConversationSummary[]>(
     [],
   );
@@ -50,7 +50,7 @@ export function MessagesScreen({ navigation }: Props) {
   }, [user]);
 
   const visibleConversations = conversations.filter(
-    (c) => !hiddenIds.has(c.peer.userId),
+    (c) => !blockedByIds.includes(c.peer.userId),
   );
 
   const onRefresh = async () => {
@@ -145,6 +145,9 @@ export function MessagesScreen({ navigation }: Props) {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{c.peer.name}</Text>
+                {blockedIds.includes(c.peer.userId) ? (
+                  <Text style={styles.blockedTag}>Engelledin</Text>
+                ) : null}
                 <Text style={styles.listing} numberOfLines={1}>
                   {c.subject}
                 </Text>
@@ -245,6 +248,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: EVColors.textPrimary,
+  },
+  blockedTag: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#92400E',
   },
   listing: {
     marginTop: 2,

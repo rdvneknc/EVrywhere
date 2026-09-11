@@ -17,7 +17,12 @@ import { User } from 'firebase/auth';
 import { db } from '../lib/firebase';
 import { EVColors } from '../theme/colors';
 import { createNotification } from './notifications';
-import { assertCanInteract, mapMessagingError } from './moderation';
+import {
+  assertCanInteract,
+  getBlockRelation,
+  mapMessagingError,
+  messageForBlockRelation,
+} from './moderation';
 import { assertRateLimit } from '../lib/rateLimit';
 
 export type PeerProfile = {
@@ -174,6 +179,11 @@ export async function sendChatMessage(
       createdAt: serverTimestamp(),
     });
   } catch (e) {
+    if (otherId) {
+      const rel = await getBlockRelation(me.uid, otherId);
+      const blockMsg = messageForBlockRelation(rel);
+      if (blockMsg) throw new Error(blockMsg);
+    }
     throw new Error(mapMessagingError(e));
   }
 
@@ -188,6 +198,11 @@ export async function sendChatMessage(
   try {
     await updateDoc(ref, updates);
   } catch (e) {
+    if (otherId) {
+      const rel = await getBlockRelation(me.uid, otherId);
+      const blockMsg = messageForBlockRelation(rel);
+      if (blockMsg) throw new Error(blockMsg);
+    }
     throw new Error(mapMessagingError(e));
   }
 

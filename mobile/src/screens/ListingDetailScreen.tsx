@@ -224,9 +224,10 @@ export function ListingDetailScreen({ navigation, route }: Props) {
           </View>
         </SafeAreaView>
       ) : (
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
-          {photos.length > 0 ? (
+        <>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.hero}>
+              {photos.length > 0 ? (
             <ScrollView
               horizontal
               pagingEnabled

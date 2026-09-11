@@ -100,7 +100,21 @@ export function ListingDetailPage() {
           initials: listing.sellerInitials,
           color: listing.sellerColor,
         },
-        `İlan: ${listing.year} ${listing.model}`,
+        {
+          type: 'listing',
+          id: listing.id,
+          title: `${listing.year} ${listing.model}`,
+          subtitle: [
+            listing.location,
+            listing.price
+              ? `${listing.price.toLocaleString('tr-TR')} ₺`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+          imageUrl: listing.photos[0],
+          href: `/ilanlar/${listing.id}`,
+        },
       );
       navigate(`/mesajlar/${id}`);
     } catch (e) {

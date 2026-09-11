@@ -109,8 +109,16 @@ export function MessagesPage() {
                         {c.lastMessageAt ? chatTimeAgo(c.lastMessageAt) : ''}
                       </span>
                     </div>
+                    {c.context && c.context.type !== 'dm' ? (
+                      <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-ev-primary">
+                        <span aria-hidden>
+                          {c.context.type === 'listing' ? '🚗' : '💬'}
+                        </span>
+                        <span className="truncate">{c.context.title}</span>
+                      </div>
+                    ) : null}
                     <div className="mt-0.5 truncate text-xs text-ev-muted">
-                      {c.lastMessage || c.subject}
+                      {c.lastMessage || 'Henüz mesaj yok'}
                     </div>
                   </div>
                   {c.unread > 0 ? (

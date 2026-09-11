@@ -26,10 +26,22 @@ export type PeerProfile = {
   color: string;
 };
 
+export type ConversationContextType = 'listing' | 'topic' | 'dm';
+
+export type ConversationContext = {
+  type: ConversationContextType;
+  id?: string;
+  title: string;
+  subtitle?: string;
+  imageUrl?: string;
+  href?: string;
+};
+
 export type ConversationSummary = {
   id: string;
   peer: PeerProfile;
   subject: string;
+  context: ConversationContext | null;
   lastMessage: string;
   lastMessageAt: number;
   unread: number;
@@ -88,19 +100,99 @@ export function chatTimeAgo(time: number): string {
   return `${Math.floor(hours / 24)} gün`;
 }
 
+function subjectFromContext(ctx: ConversationContext): string {
+  if (ctx.type === 'listing') return `İlan: ${ctx.title}`;
+  if (ctx.type === 'topic') return `Konu: ${ctx.title}`;
+  return ctx.title || 'Direkt mesaj';
+}
+
+function contextFields(ctx: ConversationContext): Record<string, string> {
+  const fields: Record<string, string> = {
+    subject: subjectFromContext(ctx).slice(0, 200),
+    contextType: ctx.type,
+    contextTitle: ctx.title.slice(0, 200),
+  };
+  if (ctx.id) fields.contextId = ctx.id.slice(0, 200);
+  if (ctx.subtitle) fields.contextSubtitle = ctx.subtitle.slice(0, 200);
+  if (ctx.imageUrl) fields.contextImage = ctx.imageUrl.slice(0, 400000);
+  if (ctx.href) fields.contextHref = ctx.href.slice(0, 400);
+  return fields;
+}
+
+function parseContext(data: Record<string, unknown>): ConversationContext | null {
+  const type = String(data.contextType ?? '');
+  const title = String(data.contextTitle ?? '').trim();
+  if (type !== 'listing' && type !== 'topic') {
+    const subject = String(data.subject ?? '').trim();
+    if (subject.startsWith('İlan: ')) {
+      return {
+        type: 'listing',
+        title: subject.slice(6).trim() || 'İlan',
+        href: undefined,
+      };
+    }
+    if (subject.startsWith('Konu: ')) {
+      return {
+        type: 'topic',
+        title: subject.slice(6).trim() || 'Konu',
+        href: undefined,
+      };
+    }
+    return null;
+  }
+  if (!title) return null;
+  return {
+    type,
+    id: data.contextId ? String(data.contextId) : undefined,
+    title,
+    subtitle: data.contextSubtitle
+      ? String(data.contextSubtitle)
+      : undefined,
+    imageUrl: data.contextImage ? String(data.contextImage) : undefined,
+    href: data.contextHref
+      ? String(data.contextHref)
+      : type === 'listing' && data.contextId
+        ? `/ilanlar/${String(data.contextId)}`
+        : type === 'topic' && data.contextId
+          ? `/forum/${String(data.contextId)}`
+          : undefined,
+  };
+}
+
+function normalizeContextArg(
+  contextOrSubject?: ConversationContext | string,
+): ConversationContext {
+  if (!contextOrSubject) {
+    return { type: 'dm', title: 'Direkt mesaj' };
+  }
+  if (typeof contextOrSubject === 'string') {
+    const s = contextOrSubject.trim() || 'Direkt mesaj';
+    if (s.startsWith('İlan: ')) {
+      return { type: 'listing', title: s.slice(6).trim() || 'İlan' };
+    }
+    if (s.startsWith('Konu: ')) {
+      return { type: 'topic', title: s.slice(6).trim() || 'Konu' };
+    }
+    return { type: 'dm', title: s };
+  }
+  return contextOrSubject;
+}
+
 export async function openOrCreateConversation(
   me: User,
   peer: PeerProfile,
-  subject = 'Direkt mesaj',
+  contextOrSubject?: ConversationContext | string,
 ): Promise<string> {
   if (peer.userId === me.uid) {
     throw new Error('Kendine mesaj gönderemezsin.');
   }
 
+  const ctx = normalizeContextArg(contextOrSubject);
   const id = conversationIdFor(me.uid, peer.userId);
   const ref = doc(db, 'conversations', id);
   const meProfile = profileFromUser(me);
   const participantIds = [me.uid, peer.userId].sort();
+  const ctxFields = contextFields(ctx);
 
   const existing = await getDoc(ref).catch(() => null);
   const exists = existing != null && existing.exists();
@@ -120,18 +212,16 @@ export async function openOrCreateConversation(
           color: peer.color,
         },
       },
-      subject,
+      ...ctxFields,
       lastMessage: '',
       lastMessageAt: serverTimestamp(),
       lastSenderId: '',
       unread: { [me.uid]: 0, [peer.userId]: 0 },
       createdAt: serverTimestamp(),
     });
-  } else if (subject && subject !== 'Direkt mesaj') {
-    const data = existing!.data();
-    if (!data.subject || data.subject === 'Direkt mesaj') {
-      await updateDoc(ref, { subject });
-    }
+  } else if (ctx.type === 'listing' || ctx.type === 'topic') {
+    // Aynı kişiyle sohbet sürer; aktif bağlamı güncelle
+    await updateDoc(ref, ctxFields);
   }
 
   return id;
@@ -215,7 +305,7 @@ export function subscribeMyConversations(
     q,
     (snap) => {
       const items: ConversationSummary[] = snap.docs.map((d) => {
-        const data = d.data();
+        const data = d.data() as Record<string, unknown>;
         const participants = (data.participants ?? {}) as Record<
           string,
           { name?: string; initials?: string; color?: string }
@@ -234,6 +324,7 @@ export function subscribeMyConversations(
             color: peerData.color ?? EV_PRIMARY,
           },
           subject: String(data.subject ?? 'Direkt mesaj'),
+          context: parseContext(data),
           lastMessage: String(data.lastMessage ?? ''),
           lastMessageAt: tsToMillis(data.lastMessageAt),
           unread: Number(unreadMap[uid] ?? 0),
@@ -280,7 +371,13 @@ export function subscribeConversationMessages(
 export function subscribeConversationMeta(
   conversationId: string,
   myUid: string,
-  onData: (meta: { peer: PeerProfile; subject: string } | null) => void,
+  onData: (
+    meta: {
+      peer: PeerProfile;
+      subject: string;
+      context: ConversationContext | null;
+    } | null,
+  ) => void,
   onError?: (error: Error) => void,
 ): () => void {
   return onSnapshot(
@@ -290,7 +387,7 @@ export function subscribeConversationMeta(
         onData(null);
         return;
       }
-      const data = snap.data();
+      const data = snap.data() as Record<string, unknown>;
       const participants = (data.participants ?? {}) as Record<
         string,
         { name?: string; initials?: string; color?: string }
@@ -307,6 +404,7 @@ export function subscribeConversationMeta(
           color: peerData.color ?? EV_PRIMARY,
         },
         subject: String(data.subject ?? 'Direkt mesaj'),
+        context: parseContext(data),
       });
     },
     (err) => onError?.(err),

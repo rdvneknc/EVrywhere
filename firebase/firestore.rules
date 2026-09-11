@@ -173,13 +173,29 @@ service cloud.firestore {
 
       allow create: if isParticipantOnCreate()
           && optionalStrLen(request.resource.data.subject, 200)
-          && optionalStrLen(request.resource.data.lastMessage, 2000);
+          && optionalStrLen(request.resource.data.lastMessage, 2000)
+          && optionalStrLen(request.resource.data.contextType, 40)
+          && optionalStrLen(request.resource.data.contextId, 200)
+          && optionalStrLen(request.resource.data.contextTitle, 200)
+          && optionalStrLen(request.resource.data.contextSubtitle, 200)
+          && optionalStrLen(request.resource.data.contextImage, 400000)
+          && optionalStrLen(request.resource.data.contextHref, 400);
       allow update: if isParticipant()
           && isParticipantSameOnUpdate()
           && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'unread', 'subject'])
+              .hasOnly([
+                'lastMessage', 'lastMessageAt', 'lastSenderId', 'unread', 'subject',
+                'contextType', 'contextId', 'contextTitle', 'contextSubtitle',
+                'contextImage', 'contextHref'
+              ])
           && optionalStrLen(request.resource.data.lastMessage, 2000)
-          && optionalStrLen(request.resource.data.subject, 200);
+          && optionalStrLen(request.resource.data.subject, 200)
+          && optionalStrLen(request.resource.data.contextType, 40)
+          && optionalStrLen(request.resource.data.contextId, 200)
+          && optionalStrLen(request.resource.data.contextTitle, 200)
+          && optionalStrLen(request.resource.data.contextSubtitle, 200)
+          && optionalStrLen(request.resource.data.contextImage, 400000)
+          && optionalStrLen(request.resource.data.contextHref, 400);
       allow delete: if false;
 
       match /messages/{messageId} {

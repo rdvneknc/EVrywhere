@@ -48,11 +48,21 @@ const GARAGE_YEARS = Array.from({ length: CURRENT_YEAR - 2010 + 1 }, (_, i) =>
 
 export function ProfileScreen() {
   const navigation = useNavigation<Nav>();
-  const { user, logOut, emailVerified, sendVerificationEmail, refreshUser } =
-    useAuth();
+  const {
+    user,
+    logOut,
+    emailVerified,
+    sendVerificationEmail,
+    refreshUser,
+    changeEmail,
+  } = useAuth();
   const [tab, setTab] = useState<TabKey>('garage');
   const [profile, setProfile] = useState<UserPublicProfile | null>(null);
   const [topics, setTopics] = useState<ForumTopic[]>([]);
+  const [showChangeEmail, setShowChangeEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [changingEmail, setChangingEmail] = useState(false);
   const [listings, setListings] = useState<EvListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -341,52 +351,65 @@ export function ProfileScreen() {
                   </Text>
                   {!emailVerified ? (
                     <Text style={styles.verifyBody}>
-                      Gelen kutundaki bağlantıyı aç, sonra “Kontrol et”e bas.
+                      Gelen kutundaki bağlantıyı aç, sonra bu ekrana geri dön.
                     </Text>
                   ) : (
                     <Text style={styles.verifyBodyOk}>
                       Hesabın güvende. Bildirimler için e-posta onaylı.
                     </Text>
                   )}
-                  {!emailVerified ? (
-                    <View style={styles.verifyActions}>
-                      <Pressable
-                        onPress={() => {
-                          void sendVerificationEmail()
-                            .then(() =>
+                  <View style={styles.verifyActions}>
+                    {!emailVerified ? (
+                      <>
+                        <Pressable
+                          onPress={() => {
+                            void sendVerificationEmail()
+                              .then(() =>
+                                Alert.alert(
+                                  'Gönderildi',
+                                  'Doğrulama e-postası gönderildi.',
+                                ),
+                              )
+                              .catch((e) =>
+                                Alert.alert(
+                                  'Gönderilemedi',
+                                  e instanceof Error
+                                    ? e.message
+                                    : 'Tekrar dene.',
+                                ),
+                              );
+                          }}
+                        >
+                          <Text style={styles.verifyLink}>Doğrula</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            void refreshUser().then((ok) => {
                               Alert.alert(
-                                'Gönderildi',
-                                'Doğrulama e-postası tekrar gönderildi.',
-                              ),
-                            )
-                            .catch((e) =>
-                              Alert.alert(
-                                'Gönderilemedi',
-                                e instanceof Error
-                                  ? e.message
-                                  : 'Tekrar dene.',
-                              ),
-                            );
-                        }}
-                      >
-                        <Text style={styles.verifyLink}>Tekrar gönder</Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => {
-                          void refreshUser().then((ok) => {
-                            Alert.alert(
-                              ok ? 'Doğrulandı' : 'Henüz değil',
-                              ok
-                                ? 'E-posta onaylandı.'
-                                : 'Maildeki bağlantıyı açtıktan sonra tekrar dene.',
-                            );
-                          });
-                        }}
-                      >
-                        <Text style={styles.verifyLink}>Kontrol et</Text>
-                      </Pressable>
-                    </View>
-                  ) : null}
+                                ok ? 'Doğrulandı' : 'Henüz değil',
+                                ok
+                                  ? 'E-posta onaylandı.'
+                                  : 'Maildeki bağlantıyı açtıktan sonra tekrar dene.',
+                              );
+                            });
+                          }}
+                        >
+                          <Text style={styles.verifyLink}>Kontrol et</Text>
+                        </Pressable>
+                      </>
+                    ) : null}
+                    <Pressable
+                      onPress={() => {
+                        setNewEmail('');
+                        setEmailPassword('');
+                        setShowChangeEmail(true);
+                      }}
+                    >
+                      <Text style={styles.verifyLink}>
+                        Mail adresini değiştir
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
               </View>
 
@@ -491,6 +514,90 @@ export function ProfileScreen() {
         onClose={() => setShowGarageEdit(false)}
         onSave={(g) => void saveGarage(g)}
       />
+
+      <Modal
+        visible={showChangeEmail}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowChangeEmail(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.emailModalWrap}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Pressable
+            style={styles.emailModalBackdrop}
+            onPress={() => setShowChangeEmail(false)}
+          />
+          <View style={styles.emailModalCard}>
+            <Text style={styles.emailModalTitle}>Mail adresini değiştir</Text>
+            <Text style={styles.emailModalSub}>
+              Mevcut: {user?.email ?? '—'}
+            </Text>
+            <TextInput
+              style={styles.emailModalInput}
+              value={newEmail}
+              onChangeText={setNewEmail}
+              placeholder="Yeni e-posta"
+              placeholderTextColor={EVColors.textHint}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+            />
+            <TextInput
+              style={styles.emailModalInput}
+              value={emailPassword}
+              onChangeText={setEmailPassword}
+              placeholder="Şifren"
+              placeholderTextColor={EVColors.textHint}
+              secureTextEntry
+              autoComplete="password"
+            />
+            <Text style={styles.emailModalHint}>
+              Onay için yeni adrese bir mail gider.
+            </Text>
+            <Pressable
+              style={[
+                styles.emailModalBtn,
+                changingEmail && { opacity: 0.7 },
+              ]}
+              disabled={changingEmail}
+              onPress={() => {
+                setChangingEmail(true);
+                void changeEmail(newEmail, emailPassword)
+                  .then(() => {
+                    setShowChangeEmail(false);
+                    Alert.alert(
+                      'Onay maili gönderildi',
+                      'Yeni adresteki bağlantıya tıklayınca e-posta güncellenir.',
+                    );
+                  })
+                  .catch((e) =>
+                    Alert.alert(
+                      'Güncellenemedi',
+                      e instanceof Error ? e.message : 'Tekrar dene.',
+                    ),
+                  )
+                  .finally(() => setChangingEmail(false));
+              }}
+            >
+              {changingEmail ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.emailModalBtnText}>Onay maili gönder</Text>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={() => setShowChangeEmail(false)}
+              style={{ marginTop: 12, alignItems: 'center' }}
+            >
+              <Text style={{ color: EVColors.textHint, fontWeight: '600' }}>
+                Vazgeç
+              </Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -1358,13 +1465,68 @@ const styles = StyleSheet.create({
   },
   verifyActions: {
     flexDirection: 'row',
-    gap: 16,
+    flexWrap: 'wrap',
+    gap: 14,
     marginTop: 8,
   },
   verifyLink: {
     fontSize: 12,
     fontWeight: '700',
     color: EVColors.primary,
+  },
+  emailModalWrap: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  emailModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  emailModalCard: {
+    backgroundColor: EVColors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 28,
+  },
+  emailModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: EVColors.textPrimary,
+  },
+  emailModalSub: {
+    marginTop: 6,
+    marginBottom: 14,
+    fontSize: 13,
+    color: EVColors.textSecondary,
+  },
+  emailModalInput: {
+    borderWidth: 1,
+    borderColor: EVColors.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: EVColors.textPrimary,
+    backgroundColor: EVColors.background,
+    marginBottom: 10,
+  },
+  emailModalHint: {
+    fontSize: 12,
+    color: EVColors.textHint,
+    marginBottom: 14,
+  },
+  emailModalBtn: {
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: EVColors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emailModalBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 15,
   },
   savedBtn: {
     marginHorizontal: 20,

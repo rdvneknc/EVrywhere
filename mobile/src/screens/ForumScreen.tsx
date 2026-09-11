@@ -43,12 +43,14 @@ import {
   compressImageUnderBytes,
   formatBytes,
 } from '../lib/imageCompress';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function ForumScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
+  const { hiddenIds } = useBlockLists();
   const [topics, setTopics] = useState<ForumTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -100,6 +102,7 @@ export function ForumScreen() {
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return topics.filter((t) => {
+      if (t.authorId && hiddenIds.has(t.authorId)) return false;
       const catOk =
         activeCategoryId === 'all' || t.categoryId === activeCategoryId;
       const brandOk =
@@ -112,7 +115,7 @@ export function ForumScreen() {
         t.excerpt.toLowerCase().includes(q);
       return catOk && brandOk && searchOk;
     });
-  }, [topics, activeCategoryId, activeBrandId, searchQuery]);
+  }, [topics, activeCategoryId, activeBrandId, searchQuery, hiddenIds]);
 
   const openDetail = (topic: ForumTopic) => {
     navigation.navigate('ForumDetail', { topic });

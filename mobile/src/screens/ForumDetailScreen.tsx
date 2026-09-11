@@ -41,12 +41,15 @@ import {
   FIRESTORE_COVER_BYTES,
   compressImageUnderBytes,
 } from '../lib/imageCompress';
+import { messageForBlockRelation } from '../api/moderation';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ForumDetail'>;
 
 export function ForumDetailScreen({ navigation, route }: Props) {
   const { topic } = route.params;
   const { user } = useAuth();
+  const { relationWith } = useBlockLists();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savingToggle, setSavingToggle] = useState(false);
@@ -72,6 +75,9 @@ export function ForumDetailScreen({ navigation, route }: Props) {
           (topic.authorName === user.displayName?.trim() ||
             topic.authorName === user.email?.split('@')[0]))),
   );
+  const authorRelation = relationWith(topic.authorId);
+  const authorBlockMessage = messageForBlockRelation(authorRelation);
+  const authorHidden = !isTopicOwner && authorRelation !== 'none';
 
   useEffect(() => {
     return subscribeForumComments(
@@ -281,6 +287,48 @@ export function ForumDetailScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {authorHidden ? (
+        <>
+          <View style={styles.topBar}>
+            <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
+              <Ionicons
+                name="chevron-back"
+                size={22}
+                color={EVColors.textPrimary}
+              />
+            </Pressable>
+            <Text style={styles.topTitle}>Forum</Text>
+            <View style={{ width: 22 }} />
+          </View>
+          <View style={{ paddingHorizontal: 24, paddingTop: 40 }}>
+            <Text
+              style={{
+                textAlign: 'center',
+                fontWeight: '700',
+                fontSize: 15,
+                color: '#92400E',
+                backgroundColor: '#FEF3C7',
+                padding: 14,
+                borderRadius: 14,
+                overflow: 'hidden',
+              }}
+            >
+              {authorBlockMessage}
+            </Text>
+            <Text
+              style={{
+                textAlign: 'center',
+                marginTop: 12,
+                color: EVColors.textSecondary,
+                fontSize: 14,
+              }}
+            >
+              Bu konu engelleme nedeniyle görüntülenemiyor.
+            </Text>
+          </View>
+        </>
+      ) : (
+      <>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -641,6 +689,8 @@ export function ForumDetailScreen({ navigation, route }: Props) {
           </View>
         </View>
       </KeyboardAvoidingView>
+      </>
+      )}
     </SafeAreaView>
   );
 }

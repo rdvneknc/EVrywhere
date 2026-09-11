@@ -6,7 +6,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { EVColors } from '../theme/colors';
 import { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../auth/AuthContext';
-import { subscribeTotalUnread } from '../api/messaging';
+import { subscribeMyConversations } from '../api/messaging';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -17,6 +18,7 @@ type Props = {
 export function HeaderMessagesButton({ compact = false }: Props) {
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
+  const { hiddenIds } = useBlockLists();
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
@@ -24,8 +26,13 @@ export function HeaderMessagesButton({ compact = false }: Props) {
       setUnread(0);
       return;
     }
-    return subscribeTotalUnread(user.uid, setUnread);
-  }, [user]);
+    return subscribeMyConversations(user.uid, (items) => {
+      const total = items
+        .filter((c) => !hiddenIds.has(c.peer.userId))
+        .reduce((sum, c) => sum + c.unread, 0);
+      setUnread(total);
+    });
+  }, [user, hiddenIds]);
 
   return (
     <Pressable

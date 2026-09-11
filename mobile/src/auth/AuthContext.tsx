@@ -1,13 +1,16 @@
 import {
   User,
+  EmailAuthProvider,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   reload,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
+  verifyBeforeUpdateEmail,
 } from 'firebase/auth';
 import React, {
   createContext,
@@ -33,6 +36,7 @@ type AuthContextValue = {
   resetPassword: (email: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   refreshUser: () => Promise<boolean>;
+  changeEmail: (newEmail: string, password: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -55,6 +59,8 @@ function mapAuthError(code: string): string {
       return 'Ağ hatası. İnternet bağlantını kontrol et.';
     case 'auth/missing-email':
       return 'Önce e-posta adresini yaz.';
+    case 'auth/requires-recent-login':
+      return 'Güvenlik için şifreni tekrar gir.';
     default:
       return 'İşlem başarısız. Tekrar dene.';
   }
@@ -148,6 +154,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await reload(current);
         setUser(auth.currentUser);
         return Boolean(auth.currentUser?.emailVerified);
+      },
+      async changeEmail(newEmail, password) {
+        const current = auth.currentUser;
+        if (!current?.email) throw new Error('Giriş gerekli.');
+        const next = newEmail.trim();
+        if (!next) throw new Error('Yeni e-posta gerekli.');
+        if (next.toLowerCase() === current.email.toLowerCase()) {
+          throw new Error('Yeni e-posta mevcut adresle aynı.');
+        }
+        try {
+          const cred = EmailAuthProvider.credential(current.email, password);
+          await reauthenticateWithCredential(current, cred);
+          await verifyBeforeUpdateEmail(current, next);
+        } catch (e) {
+          throwMapped(e);
+        }
       },
     }),
     [user, loading],

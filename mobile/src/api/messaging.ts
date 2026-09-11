@@ -17,7 +17,7 @@ import { User } from 'firebase/auth';
 import { db } from '../lib/firebase';
 import { EVColors } from '../theme/colors';
 import { createNotification } from './notifications';
-import { assertCanInteract } from './moderation';
+import { assertCanInteract, mapMessagingError } from './moderation';
 import { assertRateLimit } from '../lib/rateLimit';
 
 export type PeerProfile = {
@@ -167,11 +167,15 @@ export async function sendChatMessage(
     await assertCanInteract(me.uid, otherId);
   }
 
-  await addDoc(collection(db, 'conversations', conversationId, 'messages'), {
-    text: trimmed,
-    senderId: me.uid,
-    createdAt: serverTimestamp(),
-  });
+  try {
+    await addDoc(collection(db, 'conversations', conversationId, 'messages'), {
+      text: trimmed,
+      senderId: me.uid,
+      createdAt: serverTimestamp(),
+    });
+  } catch (e) {
+    throw new Error(mapMessagingError(e));
+  }
 
   const updates: Record<string, unknown> = {
     lastMessage: trimmed,
@@ -181,7 +185,11 @@ export async function sendChatMessage(
   if (otherId) {
     updates[`unread.${otherId}`] = increment(1);
   }
-  await updateDoc(ref, updates);
+  try {
+    await updateDoc(ref, updates);
+  } catch (e) {
+    throw new Error(mapMessagingError(e));
+  }
 
   if (otherId) {
     const preview =

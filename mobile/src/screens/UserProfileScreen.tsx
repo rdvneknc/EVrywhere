@@ -219,6 +219,10 @@ export function UserProfileScreen({ navigation, route }: Props) {
             color={EVColors.primary}
             style={{ marginTop: 28 }}
           />
+        ) : contentHidden ? (
+          <Text style={styles.blockBodyHint}>
+            Bu üyenin profili, ilanları ve içerikleri gizlendi.
+          </Text>
         ) : (
           <>
             {profile?.bio ? (
@@ -297,13 +301,14 @@ export function UserProfileScreen({ navigation, route }: Props) {
             {blockMessage ? (
               <Text style={styles.blockHint}>{blockMessage}</Text>
             ) : null}
+            {!contentHidden ? (
             <Pressable
               style={[
                 styles.msgBtn,
-                (opening || contentHidden) && { opacity: 0.75 },
+                opening && { opacity: 0.75 },
               ]}
               onPress={() => void startChat()}
-              disabled={opening || contentHidden}
+              disabled={opening}
             >
               {opening ? (
                 <ActivityIndicator color="#fff" />
@@ -314,12 +319,11 @@ export function UserProfileScreen({ navigation, route }: Props) {
                     size={18}
                     color="#fff"
                   />
-                  <Text style={styles.msgLabel}>
-                    {contentHidden ? 'Mesaj gönderilemez' : 'Mesaj gönder'}
-                  </Text>
+                  <Text style={styles.msgLabel}>Mesaj gönder</Text>
                 </>
               )}
             </Pressable>
+            ) : null}
             {user ? (
               <View style={styles.moderationRow}>
                 <Pressable style={styles.modBtn} onPress={toggleBlock}>
@@ -339,6 +343,7 @@ export function UserProfileScreen({ navigation, route }: Props) {
                     {iBlocked ? 'Engeli kaldır' : 'Engelle'}
                   </Text>
                 </Pressable>
+                {!contentHidden ? (
                 <Pressable
                   style={styles.modBtn}
                   onPress={() =>
@@ -359,6 +364,7 @@ export function UserProfileScreen({ navigation, route }: Props) {
                     Şikayet et
                   </Text>
                 </Pressable>
+                ) : null}
               </View>
             ) : null}
           </>
@@ -592,5 +598,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 10,
     overflow: 'hidden',
+  },
+  blockBodyHint: {
+    marginTop: 20,
+    textAlign: 'center',
+    color: EVColors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    paddingHorizontal: 12,
   },
 });

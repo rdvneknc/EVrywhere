@@ -38,6 +38,23 @@ service cloud.firestore {
           && request.resource.data.participants == resource.data.participants;
     }
 
+    // A↔B engeli: users/A/blocked/B veya users/B/blocked/A (ters indeks gerekmez)
+    function usersBlockEachOther(a, b) {
+      return exists(/databases/$(database)/documents/users/$(a)/blocked/$(b))
+          || exists(/databases/$(database)/documents/users/$(b)/blocked/$(a));
+    }
+
+    function otherParticipantId(ids) {
+      return ids[0] == request.auth.uid ? ids[1] : ids[0];
+    }
+
+    function messagingBlockedForConversation(conversationId) {
+      let ids = get(/databases/$(database)/documents/conversations/$(conversationId))
+          .data.participantIds;
+      return ids.size() == 2
+          && usersBlockEachOther(request.auth.uid, otherParticipantId(ids));
+    }
+
     function strLen(field, max) {
       return field is string && field.size() <= max;
     }
@@ -65,7 +82,9 @@ service cloud.firestore {
       }
 
       match /blocked/{blockedUid} {
-        allow read: if signedIn() && request.auth.uid == userId;
+        // Engelleyen veya engellenen okuyabilir (mesaj engeli için)
+        allow read: if signedIn()
+            && (request.auth.uid == userId || request.auth.uid == blockedUid);
         allow create, update: if signedIn()
             && request.auth.uid == userId
             && blockedUid != request.auth.uid;
@@ -186,6 +205,11 @@ service cloud.firestore {
           && request.auth.uid in resource.data.participantIds;
 
       allow create: if isParticipantOnCreate()
+          && request.resource.data.participantIds.size() == 2
+          && !usersBlockEachOther(
+                request.auth.uid,
+                otherParticipantId(request.resource.data.participantIds)
+              )
           && optionalStrLen(request.resource.data, 'subject', 200)
           && optionalStrLen(request.resource.data, 'lastMessage', 2000)
           && optionalStrLen(request.resource.data, 'contextType', 40)
@@ -196,6 +220,7 @@ service cloud.firestore {
           && optionalStrLen(request.resource.data, 'contextHref', 400);
       allow update: if isParticipant()
           && isParticipantSameOnUpdate()
+          && !messagingBlockedForConversation(conversationId)
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly([
                 'lastMessage', 'lastMessageAt', 'lastSenderId', 'unread', 'subject',
@@ -219,7 +244,8 @@ service cloud.firestore {
             && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
             && request.resource.data.senderId == request.auth.uid
             && request.resource.data.keys().hasAll(['text', 'senderId', 'createdAt'])
-            && strLen(request.resource.data.text, 2000);
+            && strLen(request.resource.data.text, 2000)
+            && !messagingBlockedForConversation(conversationId);
         allow update, delete: if false;
       }
     }

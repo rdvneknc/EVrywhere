@@ -195,12 +195,15 @@ export async function getBlockRelation(
   otherUid: string,
 ): Promise<BlockRelation> {
   if (!myUid || !otherUid || myUid === otherUid) return 'none';
-  const [outSnap, inSnap] = await Promise.all([
+  const [outSnap, inSnap, peerBlockedMe] = await Promise.all([
     getDoc(doc(db, 'users', myUid, 'blocked', otherUid)),
     getDoc(doc(db, 'users', myUid, 'blockedBy', otherUid)),
+    // Ters indeks yoksa bile karşı tarafın engel kaydını oku
+    getDoc(doc(db, 'users', otherUid, 'blocked', myUid)).catch(() => null),
   ]);
   const iBlocked = outSnap.exists();
-  const theyBlocked = inSnap.exists();
+  const theyBlocked =
+    inSnap.exists() || (peerBlockedMe != null && peerBlockedMe.exists());
   if (iBlocked && theyBlocked) return 'mutual';
   if (iBlocked) return 'blocked';
   if (theyBlocked) return 'blocked_by';
@@ -214,6 +217,21 @@ export async function assertCanInteract(
   const relation = await getBlockRelation(myUid, otherUid);
   const msg = messageForBlockRelation(relation);
   if (msg) throw new Error(msg);
+}
+
+/** Permission-denied (rules) → kullanıcıya anlamlı engel mesajı */
+export function mapMessagingError(e: unknown): string {
+  if (e && typeof e === 'object' && 'code' in e) {
+    const code = String((e as { code: string }).code);
+    if (
+      code === 'permission-denied' ||
+      code === 'functions/permission-denied'
+    ) {
+      return 'Bu kullanıcıyla mesajlaşamazsınız (engel).';
+    }
+  }
+  if (e instanceof Error) return e.message;
+  return 'İşlem başarısız.';
 }
 
 export function promptReportReason(): string | null {

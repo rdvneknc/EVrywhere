@@ -42,6 +42,7 @@ import { HeaderMessagesButton } from '../components/HeaderMessagesButton';
 import { useAuth } from '../auth/AuthContext';
 import { createListing, fetchListings, subscribeListings } from '../api/listings';
 import { createNotification } from '../api/notifications';
+import { useBlockLists } from '../hooks/useBlockLists';
 import {
   compressImageUnderBytes,
   FIRESTORE_PHOTO_BYTES,
@@ -64,6 +65,7 @@ const LISTING_YEARS = Array.from({ length: CURRENT_YEAR - 2010 + 1 }, (_, i) =>
 export function MarketplaceScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
+  const { hiddenIds } = useBlockLists();
   const { width } = useWindowDimensions();
   const cardW = (width - 40 - 12) / 2;
 
@@ -96,15 +98,18 @@ export function MarketplaceScreen() {
     if (!brand) return [];
     const fromDb = dbListings.filter(
       (l) =>
+        (!l.sellerUserId || !hiddenIds.has(l.sellerUserId)) &&
         l.brandId === brand.id &&
         (model === 'Tümü' || l.model === model),
     );
     return filterListings(fromDb, filter).slice(0, 24);
-  }, [brand, model, filter, dbListings]);
+  }, [brand, model, filter, dbListings, hiddenIds]);
 
   const vitrin = useMemo(() => {
-    return dbListings.slice(0, 14);
-  }, [dbListings]);
+    return dbListings
+      .filter((l) => !l.sellerUserId || !hiddenIds.has(l.sellerUserId))
+      .slice(0, 14);
+  }, [dbListings, hiddenIds]);
   const accent = brand?.color ?? EVColors.primary;
   const activeFilter = isFilterActive(filter);
 

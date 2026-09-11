@@ -37,6 +37,10 @@ import {
 } from '../api/listings';
 import { createNotification } from '../api/notifications';
 import { promptReport } from '../lib/reportPrompt';
+import {
+  messageForBlockRelation,
+} from '../api/moderation';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ListingDetail'>;
 
@@ -45,6 +49,7 @@ const { width } = Dimensions.get('window');
 export function ListingDetailScreen({ navigation, route }: Props) {
   const { listing: initial } = route.params;
   const { user } = useAuth();
+  const { relationWith } = useBlockLists();
   const [listing, setListing] = useState<EvListing>(initial);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photos, setPhotos] = useState<string[]>(initial.photos);
@@ -55,6 +60,9 @@ export function ListingDetailScreen({ navigation, route }: Props) {
   useEffect(() => subscribeFollow(() => setTick((t) => t + 1)), []);
 
   const isOwner = Boolean(user?.uid && user.uid === listing.sellerUserId);
+  const sellerRelation = relationWith(listing.sellerUserId);
+  const sellerBlockMessage = messageForBlockRelation(sellerRelation);
+  const sellerHidden = !isOwner && sellerRelation !== 'none';
 
   useEffect(() => {
     let cancelled = false;
@@ -175,6 +183,47 @@ export function ListingDetailScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.root}>
+      {sellerHidden ? (
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={{ padding: 16 }}
+            hitSlop={10}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={22}
+              color={EVColors.textPrimary}
+            />
+          </Pressable>
+          <View style={{ paddingHorizontal: 24, paddingTop: 40 }}>
+            <Text
+              style={{
+                textAlign: 'center',
+                fontWeight: '700',
+                fontSize: 15,
+                color: '#92400E',
+                backgroundColor: '#FEF3C7',
+                padding: 14,
+                borderRadius: 14,
+                overflow: 'hidden',
+              }}
+            >
+              {sellerBlockMessage}
+            </Text>
+            <Text
+              style={{
+                textAlign: 'center',
+                marginTop: 12,
+                color: EVColors.textSecondary,
+                fontSize: 14,
+              }}
+            >
+              Bu ilan engelleme nedeniyle görüntülenemiyor.
+            </Text>
+          </View>
+        </SafeAreaView>
+      ) : (
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           {photos.length > 0 ? (
@@ -473,6 +522,8 @@ export function ListingDetailScreen({ navigation, route }: Props) {
           </>
         )}
       </SafeAreaView>
+      </>
+      )}
 
       <EditListingModal
         visible={showEdit}

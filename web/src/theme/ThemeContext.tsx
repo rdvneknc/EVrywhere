@@ -16,7 +16,7 @@ type ThemeContextValue = {
   setTheme: (theme: ThemeMode) => void;
 };
 
-const STORAGE_KEY = 'ev-theme';
+const STORAGE_KEY = 'ev-theme-v2';
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
@@ -27,11 +27,7 @@ function readStoredTheme(): ThemeMode {
   } catch {
     /* ignore */
   }
-  if (typeof window !== 'undefined' && window.matchMedia) {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
-  }
+  // Varsayılan: light — dark yalnızca kullanıcı seçince
   return 'light';
 }
 

@@ -11,12 +11,18 @@ import {
 import { useAuth } from '../auth/AuthContext';
 import { formatPriceFull, type EvListing } from '../data/marketplace';
 import { openOrCreateConversation } from '../api/messaging';
-import { createReport, promptReportReason } from '../api/moderation';
+import {
+  createReport,
+  messageForBlockRelation,
+  promptReportReason,
+} from '../api/moderation';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 export function ListingDetailPage() {
   const { listingId = '' } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { relationWith } = useBlockLists();
   const [listing, setListing] = useState<EvListing | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [photoIdx, setPhotoIdx] = useState(0);
@@ -63,6 +69,9 @@ export function ListingDetailPage() {
 
   const isOwner =
     !!user && !!listing?.sellerUserId && user.uid === listing.sellerUserId;
+  const sellerRelation = relationWith(listing?.sellerUserId);
+  const sellerBlockMessage = messageForBlockRelation(sellerRelation);
+  const sellerHidden = !isOwner && sellerRelation !== 'none';
 
   useEffect(() => {
     if (!listing || !editing) return;
@@ -192,6 +201,21 @@ export function ListingDetailPage() {
           <p className="mt-8 text-sm text-red-600">{error}</p>
         ) : !listing ? (
           <p className="mt-8 text-sm text-ev-muted">İlan bulunamadı.</p>
+        ) : sellerHidden ? (
+          <section className="mt-8 rounded-3xl border border-ev-border bg-ev-surface p-8 text-center">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+              {sellerBlockMessage}
+            </p>
+            <p className="mt-2 text-sm text-ev-muted">
+              Bu ilan engelleme nedeniyle görüntülenemiyor.
+            </p>
+            <Link
+              to="/ilanlar"
+              className="mt-5 inline-flex text-sm font-bold text-ev-primary"
+            >
+              ← İlanlara dön
+            </Link>
+          </section>
         ) : (
           <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
             <div>

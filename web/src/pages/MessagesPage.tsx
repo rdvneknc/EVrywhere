@@ -8,15 +8,15 @@ import {
   subscribeMyConversations,
   type ConversationSummary,
 } from '../api/messaging';
-import { subscribeBlockedUserIds } from '../api/moderation';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 export function MessagesPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { hiddenIds } = useBlockLists();
   const [conversations, setConversations] = useState<ConversationSummary[]>(
     [],
   );
-  const [blockedIds, setBlockedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,12 +29,11 @@ export function MessagesPage() {
   useEffect(() => {
     if (!user) {
       setConversations([]);
-      setBlockedIds([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const unsubConv = subscribeMyConversations(
+    return subscribeMyConversations(
       user.uid,
       (items) => {
         setConversations(items);
@@ -46,11 +45,6 @@ export function MessagesPage() {
         setLoading(false);
       },
     );
-    const unsubBlocked = subscribeBlockedUserIds(user.uid, setBlockedIds);
-    return () => {
-      unsubConv();
-      unsubBlocked();
-    };
   }, [user]);
 
   if (authLoading || !user) {
@@ -62,9 +56,7 @@ export function MessagesPage() {
     );
   }
 
-  const visible = conversations.filter(
-    (c) => !blockedIds.includes(c.peer.userId),
-  );
+  const visible = conversations.filter((c) => !hiddenIds.has(c.peer.userId));
 
   return (
     <div className="min-h-svh bg-ev-bg">

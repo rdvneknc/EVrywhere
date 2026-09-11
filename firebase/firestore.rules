@@ -8,6 +8,7 @@ rules_version = '2';
 //   posts            — şarj istasyonu yorum/puan
 //   reports          — şikayetler
 //   users/*/blocked  — engellenen üyeler
+//   users/*/blockedBy — beni engelleyen üyeler (ters indeks)
 //   forum_topics     — forum konuları
 //   forum_topics/*/comments — konu yorumları
 //   conversations    — üyeler arası DM
@@ -69,6 +70,15 @@ service cloud.firestore {
             && request.auth.uid == userId
             && blockedUid != request.auth.uid;
         allow delete: if signedIn() && request.auth.uid == userId;
+      }
+
+      // A, B'yi engelleyince: users/B/blockedBy/A (B okur; A yazar/siler)
+      match /blockedBy/{blockerUid} {
+        allow read: if signedIn() && request.auth.uid == userId;
+        allow create, update: if signedIn()
+            && request.auth.uid == blockerUid
+            && blockerUid != userId;
+        allow delete: if signedIn() && request.auth.uid == blockerUid;
       }
     }
 

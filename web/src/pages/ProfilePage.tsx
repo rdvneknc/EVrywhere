@@ -19,8 +19,14 @@ type TabKey = 'garage' | 'forum' | 'listings';
 const YEARS = Array.from({ length: 16 }, (_, i) => String(2026 - i));
 
 export function ProfilePage() {
-  const { user, loading: authLoading, logOut, refreshUser, sendVerificationEmail } =
-    useAuth();
+  const {
+    user,
+    loading: authLoading,
+    logOut,
+    refreshUser,
+    sendVerificationEmail,
+    changeEmail,
+  } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [profile, setProfile] = useState<UserPublicProfile | null>(null);
@@ -35,6 +41,7 @@ export function ProfilePage() {
   const [listings, setListings] = useState<EvListing[]>([]);
   const [editing, setEditing] = useState(false);
   const [editingGarage, setEditingGarage] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sendingVerify, setSendingVerify] = useState(false);
@@ -83,6 +90,19 @@ export function ProfilePage() {
   }, [user?.uid]);
 
   useEffect(() => {
+    if (!user || user.emailVerified) return;
+    const onFocus = () => {
+      void refreshUser();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [user?.uid, user?.emailVerified, refreshUser]);
+
+  useEffect(() => {
     if (!user || tab !== 'forum') return;
     void fetchTopicsByAuthor(user.uid).then(setTopics).catch(() => setTopics([]));
   }, [user?.uid, tab]);
@@ -100,7 +120,9 @@ export function ProfilePage() {
     setError(null);
     try {
       await sendVerificationEmail();
-      setMessage('Doğrulama e-postası gönderildi. Gelen kutunu kontrol et.');
+      setMessage(
+        'Doğrulama e-postası gönderildi. Gelen kutunu kontrol et; ardından bu sayfaya geri dön.',
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gönderilemedi');
     } finally {
@@ -200,15 +222,15 @@ export function ProfilePage() {
                         onClick={() => void onVerify()}
                         className="rounded-full bg-amber-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
                       >
-                        {sendingVerify ? 'Gönderiliyor…' : 'Doğrulama maili'}
+                        {sendingVerify ? 'Gönderiliyor…' : 'Doğrula'}
                       </button>
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => void refreshUser()}
+                      onClick={() => setEditingEmail(true)}
                       className="rounded-full border border-ev-border bg-ev-surface px-3 py-1.5 text-xs font-bold text-ev-muted"
                     >
-                      Yenile
+                      Mail adresini değiştir
                     </button>
                   </div>
                 </div>
@@ -369,6 +391,20 @@ export function ProfilePage() {
         />
       ) : null}
 
+      {editingEmail ? (
+        <ChangeEmailModal
+          currentEmail={user.email ?? ''}
+          onClose={() => setEditingEmail(false)}
+          onSave={async (nextEmail, password) => {
+            await changeEmail(nextEmail, password);
+            setEditingEmail(false);
+            setMessage(
+              'Yeni adrese onay maili gönderildi. Bağlantıya tıklayınca e-posta güncellenir.',
+            );
+          }}
+        />
+      ) : null}
+
       {editingGarage && profile ? (
         <EditGarageModal
           garage={profile.garage}
@@ -525,6 +561,77 @@ function EditProfileModal({
           className="w-full rounded-full bg-ev-primary py-2.5 text-sm font-extrabold text-white disabled:opacity-60"
         >
           {saving ? 'Kaydediliyor…' : 'Kaydet'}
+        </button>
+      </form>
+    </ModalShell>
+  );
+}
+
+function ChangeEmailModal({
+  currentEmail,
+  onClose,
+  onSave,
+}: {
+  currentEmail: string;
+  onClose: () => void;
+  onSave: (email: string, password: string) => Promise<void>;
+}) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setErr(null);
+    try {
+      await onSave(email, password);
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Güncellenemedi');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ModalShell title="Mail adresini değiştir" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <p className="text-sm text-ev-muted">
+          Mevcut adres: <span className="font-semibold text-ev-text">{currentEmail}</span>
+        </p>
+        <label className="block text-sm">
+          <span className="font-bold text-ev-muted">Yeni e-posta</span>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full rounded-xl border border-ev-border bg-ev-bg px-3 py-2"
+            required
+            autoComplete="email"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="font-bold text-ev-muted">Şifren</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="mt-1 w-full rounded-xl border border-ev-border bg-ev-bg px-3 py-2"
+            required
+            autoComplete="current-password"
+          />
+        </label>
+        <p className="text-xs text-ev-hint">
+          Onay için yeni adrese bir mail gider. Bağlantıya tıklayınca adres
+          güncellenir.
+        </p>
+        {err ? <p className="text-sm text-red-600">{err}</p> : null}
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full rounded-full bg-ev-primary py-2.5 text-sm font-extrabold text-white disabled:opacity-60"
+        >
+          {saving ? 'Gönderiliyor…' : 'Onay maili gönder'}
         </button>
       </form>
     </ModalShell>

@@ -9,9 +9,11 @@ import {
 } from '../data/forum';
 import { subscribeForumTopics } from '../api/forumTopics';
 import { useAuth } from '../auth/AuthContext';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 export function ForumPage() {
   const { user } = useAuth();
+  const { hiddenIds } = useBlockLists();
   const [topics, setTopics] = useState<ForumTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,9 +34,12 @@ export function ForumPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    if (categoryId === 'all') return topics;
-    return topics.filter((t) => t.categoryId === categoryId);
-  }, [topics, categoryId]);
+    const visible = topics.filter(
+      (t) => !t.authorId || !hiddenIds.has(t.authorId),
+    );
+    if (categoryId === 'all') return visible;
+    return visible.filter((t) => t.categoryId === categoryId);
+  }, [topics, categoryId, hiddenIds]);
 
   return (
     <div className="min-h-svh bg-ev-bg">

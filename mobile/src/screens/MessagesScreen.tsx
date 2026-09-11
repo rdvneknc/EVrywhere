@@ -20,7 +20,7 @@ import {
   chatTimeAgo,
   subscribeMyConversations,
 } from '../api/messaging';
-import { subscribeBlockedUserIds } from '../api/moderation';
+import { subscribeHiddenUserIds } from '../api/moderation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Messages'>;
 
@@ -29,14 +29,14 @@ export function MessagesScreen({ navigation }: Props) {
   const [conversations, setConversations] = useState<ConversationSummary[]>(
     [],
   );
-  const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!user) {
       setConversations([]);
-      setBlockedIds([]);
+      setHiddenIds([]);
       setLoading(false);
       return;
     }
@@ -48,15 +48,15 @@ export function MessagesScreen({ navigation }: Props) {
       },
       () => setLoading(false),
     );
-    const unsubBlocked = subscribeBlockedUserIds(user.uid, setBlockedIds);
+    const unsubHidden = subscribeHiddenUserIds(user.uid, setHiddenIds);
     return () => {
       unsubConv();
-      unsubBlocked();
+      unsubHidden();
     };
   }, [user]);
 
   const visibleConversations = conversations.filter(
-    (c) => !blockedIds.includes(c.peer.userId),
+    (c) => !hiddenIds.includes(c.peer.userId),
   );
 
   const onRefresh = async () => {

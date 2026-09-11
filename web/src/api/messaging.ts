@@ -17,6 +17,7 @@ import type { User } from 'firebase/auth';
 import { db } from '../lib/firebase';
 import { EV_PRIMARY } from '../data/forum';
 import { createNotification } from './notifications';
+import { assertCanInteract } from './moderation';
 import { assertRateLimit } from '../lib/rateLimit';
 
 export type PeerProfile = {
@@ -186,6 +187,7 @@ export async function openOrCreateConversation(
   if (peer.userId === me.uid) {
     throw new Error('Kendine mesaj gönderemezsin.');
   }
+  await assertCanInteract(me.uid, peer.userId);
 
   const ctx = normalizeContextArg(contextOrSubject);
   const id = conversationIdFor(me.uid, peer.userId);
@@ -250,6 +252,10 @@ export async function sendChatMessage(
   }
 
   const otherId = participantIds.find((id) => id !== me.uid);
+  if (otherId) {
+    await assertCanInteract(me.uid, otherId);
+  }
+
   await addDoc(collection(db, 'conversations', conversationId, 'messages'), {
     text: trimmed,
     senderId: me.uid,

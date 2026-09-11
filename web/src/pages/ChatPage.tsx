@@ -14,11 +14,17 @@ import {
   type ConversationContext,
   type PeerProfile,
 } from '../api/messaging';
+import {
+  messageForBlockRelation,
+  type BlockRelation,
+} from '../api/moderation';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 export function ChatPage() {
   const { conversationId = '' } = useParams();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { relationWith } = useBlockLists();
   const [messages, setMessages] = useState<ChatMessageDoc[]>([]);
   const [peer, setPeer] = useState<PeerProfile | null>(null);
   const [context, setContext] = useState<ConversationContext | null>(null);
@@ -27,6 +33,10 @@ export function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const blockRelation: BlockRelation = relationWith(peer?.userId);
+  const blockMessage = messageForBlockRelation(blockRelation);
+  const messagingLocked = blockRelation !== 'none';
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -78,7 +88,7 @@ export function ChatPage() {
 
   const onSend = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user || !conversationId || !text.trim()) return;
+    if (!user || !conversationId || !text.trim() || messagingLocked) return;
     setSending(true);
     setError(null);
     try {
@@ -157,6 +167,12 @@ export function ChatPage() {
               )}
             </div>
 
+            {blockMessage ? (
+              <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
+                {blockMessage}
+              </div>
+            ) : null}
+
             {context && context.type !== 'dm' ? (
               <div className="mb-3">
                 <ConversationContextCard context={context} />
@@ -166,11 +182,13 @@ export function ChatPage() {
             <div className="flex-1 space-y-2 overflow-y-auto rounded-2xl border border-ev-border bg-ev-surface p-4">
               {messages.length === 0 ? (
                 <p className="py-8 text-center text-sm text-ev-hint">
-                  {context?.type === 'listing'
-                    ? 'Bu ilan hakkında ilk mesajı sen yaz.'
-                    : context?.type === 'topic'
-                      ? 'Bu konu hakkında ilk mesajı sen yaz.'
-                      : 'Henüz mesaj yok. İlk mesajı sen yaz.'}
+                  {messagingLocked
+                    ? 'Mesaj gönderilemez.'
+                    : context?.type === 'listing'
+                      ? 'Bu ilan hakkında ilk mesajı sen yaz.'
+                      : context?.type === 'topic'
+                        ? 'Bu konu hakkında ilk mesajı sen yaz.'
+                        : 'Henüz mesaj yok. İlk mesajı sen yaz.'}
                 </p>
               ) : (
                 messages.map((m) => (
@@ -206,22 +224,28 @@ export function ChatPage() {
               </p>
             ) : null}
 
-            <form onSubmit={onSend} className="mt-3 flex gap-2">
-              <input
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                maxLength={2000}
-                placeholder={placeholder}
-                className="min-w-0 flex-1 rounded-xl border border-ev-border bg-ev-surface px-3 py-2.5 text-sm outline-none focus:border-ev-primary"
-              />
-              <button
-                type="submit"
-                disabled={sending || !text.trim()}
-                className="rounded-xl bg-ev-primary px-4 py-2.5 text-sm font-extrabold text-white hover:bg-ev-primary-dark disabled:opacity-60"
-              >
-                {sending ? '…' : 'Gönder'}
-              </button>
-            </form>
+            {messagingLocked ? (
+              <p className="mt-3 rounded-xl border border-ev-border bg-ev-surface px-4 py-3 text-center text-sm text-ev-muted">
+                {blockMessage}
+              </p>
+            ) : (
+              <form onSubmit={onSend} className="mt-3 flex gap-2">
+                <input
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  maxLength={2000}
+                  placeholder={placeholder}
+                  className="min-w-0 flex-1 rounded-xl border border-ev-border bg-ev-surface px-3 py-2.5 text-sm outline-none focus:border-ev-primary"
+                />
+                <button
+                  type="submit"
+                  disabled={sending || !text.trim()}
+                  className="rounded-xl bg-ev-primary px-4 py-2.5 text-sm font-extrabold text-white hover:bg-ev-primary-dark disabled:opacity-60"
+                >
+                  {sending ? '…' : 'Gönder'}
+                </button>
+              </form>
+            )}
           </>
         )}
       </main>

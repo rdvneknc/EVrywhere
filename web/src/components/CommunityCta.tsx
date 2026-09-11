@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { COMMUNITY_STATS } from '../data/forumHome';
+import { useAuth } from '../auth/AuthContext';
 
 const AVATARS = [
   { initials: 'AK', color: '#1a8c40' },
@@ -11,6 +12,8 @@ const AVATARS = [
 ] as const;
 
 export function CommunityCta() {
+  const { user } = useAuth();
+
   return (
     <section className="border-t border-ev-divider bg-ev-primary-light">
       <div className="mx-auto max-w-6xl px-4 py-14 lg:px-6">
@@ -57,10 +60,10 @@ export function CommunityCta() {
               </span>
             </div>
             <Link
-              to="/giris"
+              to={user ? '/forum' : '/giris?next=/forum'}
               className="mt-8 inline-flex rounded-xl bg-ev-primary px-6 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-ev-primary/30 transition hover:bg-ev-primary-dark"
             >
-              Ücretsiz katıl
+              {user ? 'Foruma git' : 'Ücretsiz katıl'}
             </Link>
           </div>
         </div>

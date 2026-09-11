@@ -1,11 +1,12 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 
 export function LoginPage() {
-  const { signIn, signUp, resetPassword } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, resetPassword } =
+    useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = params.get('next') || '/forum';
@@ -17,6 +18,12 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(next, { replace: true });
+    }
+  }, [authLoading, user, navigate, next]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();

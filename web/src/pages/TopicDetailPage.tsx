@@ -21,13 +21,15 @@ import {
   subscribeTopicSaved,
   toggleSaveTopic,
 } from '../api/savedTopics';
-import { createReport, promptReportReason } from '../api/moderation';
+import { createReport, messageForBlockRelation, promptReportReason } from '../api/moderation';
 import { useAuth } from '../auth/AuthContext';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 export function TopicDetailPage() {
   const { topicId = '' } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { relationWith } = useBlockLists();
   const [topic, setTopic] = useState<ForumTopic | null>(null);
   const [comments, setComments] = useState<ForumComment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +79,9 @@ export function TopicDetailPage() {
 
   const isTopicOwner =
     !!user && !!topic?.authorId && user.uid === topic.authorId;
+  const authorRelation = relationWith(topic?.authorId);
+  const authorBlockMessage = messageForBlockRelation(authorRelation);
+  const authorHidden = !isTopicOwner && authorRelation !== 'none';
 
   const onReply = async (e: FormEvent) => {
     e.preventDefault();
@@ -193,6 +198,21 @@ export function TopicDetailPage() {
           <p className="mt-8 text-sm text-red-600">{error}</p>
         ) : !topic ? (
           <p className="mt-8 text-sm text-ev-muted">Konu bulunamadı.</p>
+        ) : authorHidden ? (
+          <section className="mt-8 rounded-3xl border border-ev-border bg-ev-surface p-8 text-center">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+              {authorBlockMessage}
+            </p>
+            <p className="mt-2 text-sm text-ev-muted">
+              Bu konu engelleme nedeniyle görüntülenemiyor.
+            </p>
+            <Link
+              to="/forum"
+              className="mt-5 inline-flex text-sm font-bold text-ev-primary"
+            >
+              ← Foruma dön
+            </Link>
+          </section>
         ) : (
           <>
             <article className="mt-6 rounded-3xl border border-ev-border bg-ev-surface p-5 sm:p-6">

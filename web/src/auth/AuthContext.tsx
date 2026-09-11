@@ -1,12 +1,15 @@
 import {
+  EmailAuthProvider,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   reload,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
+  verifyBeforeUpdateEmail,
 } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import {
@@ -29,6 +32,7 @@ type AuthContextValue = {
   resetPassword: (email: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
+  changeEmail: (newEmail: string, password: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -49,6 +53,8 @@ function mapAuthError(code: string): string {
       return 'Çok fazla deneme. Biraz sonra tekrar dene.';
     case 'auth/unauthorized-domain':
       return 'Bu domain Auth için yetkili değil (Console’da ekle).';
+    case 'auth/requires-recent-login':
+      return 'Güvenlik için şifreni tekrar gir.';
     default:
       return 'İşlem başarısız. Tekrar dene.';
   }
@@ -124,6 +130,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!auth.currentUser) throw new Error('Giriş gerekli.');
         try {
           await sendEmailVerification(auth.currentUser);
+        } catch (e) {
+          throwMapped(e);
+        }
+      },
+      async changeEmail(newEmail, password) {
+        const current = auth.currentUser;
+        if (!current?.email) throw new Error('Giriş gerekli.');
+        const next = newEmail.trim();
+        if (!next) throw new Error('Yeni e-posta gerekli.');
+        if (next.toLowerCase() === current.email.toLowerCase()) {
+          throw new Error('Yeni e-posta mevcut adresle aynı.');
+        }
+        try {
+          const cred = EmailAuthProvider.credential(current.email, password);
+          await reauthenticateWithCredential(current, cred);
+          await verifyBeforeUpdateEmail(current, next);
         } catch (e) {
           throwMapped(e);
         }

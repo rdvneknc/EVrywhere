@@ -1,21 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { subscribeListings } from '../api/listings';
 import { formatPrice, type EvListing } from '../data/marketplace';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 export function FeaturedListings() {
+  const { hiddenIds } = useBlockLists();
   const [listings, setListings] = useState<EvListing[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     return subscribeListings(
       (items) => {
-        setListings(items.slice(0, 4));
+        setListings(items);
         setLoading(false);
       },
       () => setLoading(false),
     );
   }, []);
+
+  const visible = useMemo(
+    () =>
+      listings
+        .filter((l) => !l.sellerUserId || !hiddenIds.has(l.sellerUserId))
+        .slice(0, 4),
+    [listings, hiddenIds],
+  );
 
   return (
     <section id="ilanlar" className="border-t border-ev-divider bg-ev-bg">
@@ -46,9 +56,13 @@ export function FeaturedListings() {
               İlk ilanı ver
             </Link>
           </p>
+        ) : visible.length === 0 ? (
+          <p className="py-8 text-center text-sm text-ev-muted">
+            Gösterilecek ilan yok.
+          </p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {listings.map((listing) => {
+            {visible.map((listing) => {
               const cover = listing.photos[0];
               return (
                 <Link

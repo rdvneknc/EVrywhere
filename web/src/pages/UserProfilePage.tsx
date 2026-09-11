@@ -12,21 +12,27 @@ import { openOrCreateConversation } from '../api/messaging';
 import {
   blockUser,
   createReport,
+  messageForBlockRelation,
   promptReportReason,
-  subscribeBlockedUserIds,
   unblockUser,
 } from '../api/moderation';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 export function UserProfilePage() {
   const { userId = '' } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { relationWith } = useBlockLists();
   const [profile, setProfile] = useState<UserPublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [blocked, setBlocked] = useState(false);
   const [messaging, setMessaging] = useState(false);
   const isSelf = !!user && user.uid === userId;
+
+  const relation = isSelf ? 'none' : relationWith(userId);
+  const blockMessage = messageForBlockRelation(relation);
+  const iBlocked = relation === 'blocked' || relation === 'mutual';
+  const contentHidden = relation !== 'none';
 
   useEffect(() => {
     if (!userId) return;
@@ -49,22 +55,12 @@ export function UserProfilePage() {
     };
   }, [userId]);
 
-  useEffect(() => {
-    if (!user || isSelf) {
-      setBlocked(false);
-      return;
-    }
-    return subscribeBlockedUserIds(user.uid, (ids) => {
-      setBlocked(ids.includes(userId));
-    });
-  }, [user, userId, isSelf]);
-
   const startChat = async () => {
     if (!user) {
       navigate(`/giris?next=/u/${userId}`);
       return;
     }
-    if (isSelf || blocked || messaging) return;
+    if (isSelf || contentHidden || messaging) return;
     setMessaging(true);
     setError(null);
     try {
@@ -105,7 +101,7 @@ export function UserProfilePage() {
   const onToggleBlock = async () => {
     if (!user || isSelf) return;
     try {
-      if (blocked) {
+      if (iBlocked) {
         await unblockUser(user.uid, userId);
       } else {
         if (!window.confirm('Bu kullanıcıyı engellemek istiyor musun?')) return;
@@ -130,6 +126,30 @@ export function UserProfilePage() {
           <p className="mt-8 text-sm text-red-600">{error}</p>
         ) : !profile ? (
           <p className="mt-8 text-sm text-ev-muted">Kullanıcı bulunamadı.</p>
+        ) : contentHidden ? (
+          <section className="mt-6 rounded-3xl border border-ev-border bg-ev-surface p-6 text-center">
+            <h1 className="text-xl font-extrabold text-ev-text">
+              {profile.displayName}
+            </h1>
+            <p className="mt-4 text-sm font-semibold text-amber-800 dark:text-amber-200">
+              {blockMessage}
+            </p>
+            <p className="mt-2 text-sm text-ev-muted">
+              Bu üyenin profili, ilanları ve içerikleri gizlendi.
+            </p>
+            {user && iBlocked ? (
+              <button
+                type="button"
+                onClick={() => void onToggleBlock()}
+                className="mt-5 rounded-full border border-ev-border px-4 py-2 text-xs font-bold text-ev-primary hover:border-ev-primary"
+              >
+                Engeli kaldır
+              </button>
+            ) : null}
+            {error ? (
+              <p className="mt-3 text-sm text-red-600">{error}</p>
+            ) : null}
+          </section>
         ) : (
           <>
             <section className="mt-6 rounded-3xl border border-ev-border bg-ev-surface p-5 sm:p-6">
@@ -179,7 +199,7 @@ export function UserProfilePage() {
                 <div className="mt-5 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    disabled={messaging || blocked}
+                    disabled={messaging}
                     onClick={() => void startChat()}
                     className="rounded-full bg-ev-primary px-4 py-2 text-xs font-extrabold text-white hover:bg-ev-primary-dark disabled:opacity-60"
                   >
@@ -192,7 +212,7 @@ export function UserProfilePage() {
                         onClick={() => void onToggleBlock()}
                         className="rounded-full border border-ev-border px-4 py-2 text-xs font-bold text-ev-muted hover:border-red-300 hover:text-red-600"
                       >
-                        {blocked ? 'Engeli kaldır' : 'Engelle'}
+                        Engelle
                       </button>
                       <button
                         type="button"

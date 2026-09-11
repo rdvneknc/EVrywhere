@@ -4,6 +4,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { subscribeListings } from '../api/listings';
 import { useAuth } from '../auth/AuthContext';
+import { useBlockLists } from '../hooks/useBlockLists';
 import {
   DEFAULT_FILTER,
   EV_BRANDS,
@@ -37,6 +38,7 @@ function toDraft(f: ListingFilter): DraftFilter {
 
 export function MarketplacePage() {
   const { user } = useAuth();
+  const { hiddenIds } = useBlockLists();
   const [searchParams] = useSearchParams();
   const textQuery = searchParams.get('q')?.trim() ?? '';
   const [listings, setListings] = useState<EvListing[]>([]);
@@ -82,7 +84,9 @@ export function MarketplacePage() {
   }, [listings]);
 
   const filtered = useMemo(() => {
-    let list = listings;
+    let list = listings.filter(
+      (l) => !l.sellerUserId || !hiddenIds.has(l.sellerUserId),
+    );
     if (brandId !== 'all') list = list.filter((l) => l.brandId === brandId);
     if (model !== 'all') list = list.filter((l) => l.model === model);
     if (city !== 'all') list = list.filter((l) => l.location === city);
@@ -98,7 +102,7 @@ export function MarketplacePage() {
       });
     }
     return filterListings(list, filter);
-  }, [listings, brandId, model, city, filter, textQuery]);
+  }, [listings, brandId, model, city, filter, textQuery, hiddenIds]);
 
   const applyNumericFilters = () => {
     setFilter((f) => ({

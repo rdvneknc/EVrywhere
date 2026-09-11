@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CATEGORY_BADGE, type ForumTopic } from '../data/forum';
 import { subscribeForumTopics } from '../api/forumTopics';
 import { useAuth } from '../auth/AuthContext';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 export function ForumSection() {
   const { user } = useAuth();
+  const { hiddenIds } = useBlockLists();
   const [topics, setTopics] = useState<ForumTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +15,7 @@ export function ForumSection() {
   useEffect(() => {
     return subscribeForumTopics(
       (items) => {
-        setTopics(items.slice(0, 6));
+        setTopics(items);
         setLoading(false);
         setError(null);
       },
@@ -23,6 +25,14 @@ export function ForumSection() {
       },
     );
   }, []);
+
+  const visible = useMemo(
+    () =>
+      topics
+        .filter((t) => !t.authorId || !hiddenIds.has(t.authorId))
+        .slice(0, 6),
+    [topics, hiddenIds],
+  );
 
   return (
     <section id="forum" className="bg-ev-surface">
@@ -62,9 +72,13 @@ export function ForumSection() {
                   İlk konuyu aç
                 </Link>
               </p>
+            ) : visible.length === 0 ? (
+              <p className="py-10 text-center text-sm text-ev-muted">
+                Gösterilecek konu yok.
+              </p>
             ) : (
               <ul className="divide-y divide-ev-divider">
-                {topics.map((topic) => {
+                {visible.map((topic) => {
                   const badge =
                     CATEGORY_BADGE[topic.categoryId] ?? CATEGORY_BADGE.general;
                   return (

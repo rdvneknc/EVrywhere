@@ -26,6 +26,11 @@ import {
   subscribeConversationMessages,
   subscribeConversationMeta,
 } from '../api/messaging';
+import {
+  getBlockRelation,
+  messageForBlockRelation,
+  type BlockRelation,
+} from '../api/moderation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
@@ -39,7 +44,11 @@ export function ChatScreen({ navigation, route }: Props) {
   const [missing, setMissing] = useState(false);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [blockRelation, setBlockRelation] = useState<BlockRelation>('none');
   const scrollRef = useRef<ScrollView>(null);
+
+  const blockMessage = messageForBlockRelation(blockRelation);
+  const messagingLocked = blockRelation !== 'none';
 
   useEffect(() => {
     if (!user) return;
@@ -55,6 +64,7 @@ export function ChatScreen({ navigation, route }: Props) {
         setPeer(meta.peer);
         setSubject(meta.subject);
         setMissing(false);
+        void getBlockRelation(user.uid, meta.peer.userId).then(setBlockRelation);
       },
     );
     const unsubMsgs = subscribeConversationMessages(
@@ -75,7 +85,7 @@ export function ChatScreen({ navigation, route }: Props) {
 
   const send = async () => {
     const t = text.trim();
-    if (!t || !user || sending) return;
+    if (!t || !user || sending || messagingLocked) return;
     setSending(true);
     try {
       await sendChatMessage(conversationId, user, t);
@@ -194,26 +204,34 @@ export function ChatScreen({ navigation, route }: Props) {
           </ScrollView>
         )}
 
-        <View style={styles.composer}>
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={setText}
-            placeholder="Mesaj yaz…"
-            placeholderTextColor={EVColors.textHint}
-          />
-          <Pressable
-            style={[styles.send, sending && { opacity: 0.7 }]}
-            onPress={() => void send()}
-            disabled={sending}
-          >
-            {sending ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Ionicons name="send" size={17} color="#fff" />
-            )}
-          </Pressable>
-        </View>
+        {blockMessage ? (
+          <View style={styles.blockBanner}>
+            <Text style={styles.blockBannerText}>{blockMessage}</Text>
+          </View>
+        ) : null}
+
+        {messagingLocked ? null : (
+          <View style={styles.composer}>
+            <TextInput
+              style={styles.input}
+              value={text}
+              onChangeText={setText}
+              placeholder="Mesaj yaz…"
+              placeholderTextColor={EVColors.textHint}
+            />
+            <Pressable
+              style={[styles.send, sending && { opacity: 0.7 }]}
+              onPress={() => void send()}
+              disabled={sending}
+            >
+              {sending ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Ionicons name="send" size={17} color="#fff" />
+              )}
+            </Pressable>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -232,6 +250,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: EVColors.textHint,
     marginTop: 40,
+  },
+  blockBanner: {
+    marginHorizontal: 12,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#FEF3C7',
+  },
+  blockBannerText: {
+    textAlign: 'center',
+    color: '#92400E',
+    fontWeight: '600',
+    fontSize: 13,
   },
   topBar: {
     flexDirection: 'row',

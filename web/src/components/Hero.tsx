@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 
 const HERO_STATS = [
   { label: 'Üye', value: '12K+', icon: '👥' },
@@ -8,6 +9,8 @@ const HERO_STATS = [
 ] as const;
 
 export function Hero() {
+  const { user } = useAuth();
+
   return (
     <section className="relative overflow-hidden bg-[#0b0f14]">
       <div className="absolute inset-0">
@@ -38,10 +41,10 @@ export function Hero() {
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
-                to="/giris"
+                to={user ? '/forum/yeni' : '/giris?next=/forum'}
                 className="rounded-xl bg-ev-primary px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-ev-primary/35 transition hover:bg-ev-primary-dark sm:px-6 sm:py-3.5"
               >
-                Hemen Katıl
+                {user ? 'Konu aç' : 'Hemen Katıl'}
               </Link>
               <Link
                 to="/forum"

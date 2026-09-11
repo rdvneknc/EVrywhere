@@ -23,8 +23,11 @@ import {
 } from '../api/users';
 import {
   blockUser,
-  fetchBlockedUserIds,
+  getBlockRelation,
+  messageForBlockRelation,
+  syncOutgoingBlockMirrors,
   unblockUser,
+  type BlockRelation,
 } from '../api/moderation';
 import { promptReport } from '../lib/reportPrompt';
 
@@ -36,8 +39,11 @@ export function UserProfileScreen({ navigation, route }: Props) {
   const [opening, setOpening] = useState(false);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserPublicProfile | null>(null);
-  const [blocked, setBlocked] = useState(false);
+  const [relation, setRelation] = useState<BlockRelation>('none');
   const isSelf = user?.uid === userId;
+  const blockMessage = messageForBlockRelation(relation);
+  const iBlocked = relation === 'blocked' || relation === 'mutual';
+  const contentHidden = relation !== 'none';
 
   useEffect(() => {
     let alive = true;
@@ -72,13 +78,16 @@ export function UserProfileScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     if (!user || isSelf) {
-      setBlocked(false);
+      setRelation('none');
       return;
     }
     let alive = true;
-    void fetchBlockedUserIds(user.uid).then((ids) => {
-      if (alive) setBlocked(ids.includes(userId));
-    });
+    void syncOutgoingBlockMirrors(user.uid)
+      .catch(() => undefined)
+      .then(() => getBlockRelation(user.uid, userId))
+      .then((r) => {
+        if (alive) setRelation(r);
+      });
     return () => {
       alive = false;
     };
@@ -97,8 +106,8 @@ export function UserProfileScreen({ navigation, route }: Props) {
       Alert.alert('Bu sensin', 'Kendine mesaj gönderemezsin.');
       return;
     }
-    if (blocked) {
-      Alert.alert('Engelli', 'Engellediğin üyeye mesaj gönderemezsin.');
+    if (contentHidden) {
+      Alert.alert('Engelli', blockMessage ?? 'Mesaj gönderilemez.');
       return;
     }
     if (opening) return;
@@ -127,10 +136,12 @@ export function UserProfileScreen({ navigation, route }: Props) {
 
   const toggleBlock = () => {
     if (!user || isSelf) return;
-    if (blocked) {
+    if (iBlocked) {
       void unblockUser(user.uid, userId)
         .then(() => {
-          setBlocked(false);
+          setRelation((prev) =>
+            prev === 'mutual' ? 'blocked_by' : 'none',
+          );
           Alert.alert('Engel kaldırıldı');
         })
         .catch((e) =>
@@ -143,7 +154,7 @@ export function UserProfileScreen({ navigation, route }: Props) {
     }
     Alert.alert(
       'Engelle',
-      `${displayName} engellensin mi? Mesaj listesinde gizlenir.`,
+      `${displayName} engellensin mi? Profili, ilanları ve mesajları gizlenir.`,
       [
         { text: 'İptal', style: 'cancel' },
         {
@@ -152,7 +163,9 @@ export function UserProfileScreen({ navigation, route }: Props) {
           onPress: () => {
             void blockUser(user.uid, userId)
               .then(() => {
-                setBlocked(true);
+                setRelation((prev) =>
+                  prev === 'blocked_by' ? 'mutual' : 'blocked',
+                );
                 Alert.alert('Engellendi');
               })
               .catch((e) =>
@@ -281,13 +294,16 @@ export function UserProfileScreen({ navigation, route }: Props) {
 
         {!isSelf ? (
           <>
+            {blockMessage ? (
+              <Text style={styles.blockHint}>{blockMessage}</Text>
+            ) : null}
             <Pressable
               style={[
                 styles.msgBtn,
-                (opening || blocked) && { opacity: 0.75 },
+                (opening || contentHidden) && { opacity: 0.75 },
               ]}
               onPress={() => void startChat()}
-              disabled={opening || blocked}
+              disabled={opening || contentHidden}
             >
               {opening ? (
                 <ActivityIndicator color="#fff" />
@@ -299,7 +315,7 @@ export function UserProfileScreen({ navigation, route }: Props) {
                     color="#fff"
                   />
                   <Text style={styles.msgLabel}>
-                    {blocked ? 'Engelli üye' : 'Mesaj gönder'}
+                    {contentHidden ? 'Mesaj gönderilemez' : 'Mesaj gönder'}
                   </Text>
                 </>
               )}
@@ -308,19 +324,19 @@ export function UserProfileScreen({ navigation, route }: Props) {
               <View style={styles.moderationRow}>
                 <Pressable style={styles.modBtn} onPress={toggleBlock}>
                   <Ionicons
-                    name={blocked ? 'lock-open-outline' : 'ban-outline'}
+                    name={iBlocked ? 'lock-open-outline' : 'ban-outline'}
                     size={16}
-                    color={blocked ? EVColors.primary : EVColors.error}
+                    color={iBlocked ? EVColors.primary : EVColors.error}
                   />
                   <Text
                     style={[
                       styles.modBtnText,
                       {
-                        color: blocked ? EVColors.primary : EVColors.error,
+                        color: iBlocked ? EVColors.primary : EVColors.error,
                       },
                     ]}
                   >
-                    {blocked ? 'Engeli kaldır' : 'Engelle'}
+                    {iBlocked ? 'Engeli kaldır' : 'Engelle'}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -564,5 +580,17 @@ const styles = StyleSheet.create({
     marginTop: 28,
     fontSize: 14,
     color: EVColors.textHint,
+  },
+  blockHint: {
+    textAlign: 'center',
+    color: '#92400E',
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    fontWeight: '600',
+    fontSize: 13,
+    marginBottom: 10,
+    overflow: 'hidden',
   },
 });

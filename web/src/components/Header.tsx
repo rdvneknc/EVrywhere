@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { subscribeUserNotifications } from '../api/notifications';
+import {
+  markNotificationRead,
+  subscribeUserNotifications,
+  timeAgo,
+  type AppNotification,
+} from '../api/notifications';
+import { subscribeMyConversations } from '../api/messaging';
 import { useTheme } from '../theme/ThemeContext';
+import { useBlockLists } from '../hooks/useBlockLists';
 
 const NAV = [
   { label: 'Ana Sayfa', to: '/' },
@@ -17,9 +24,11 @@ const ACCOUNT_MENU = [
   { label: 'Garajım', to: '/profil?tab=garage' },
   { label: 'Konularım', to: '/profil?tab=forum' },
   { label: 'İlanlarım', to: '/profil?tab=listings' },
-  { label: 'Mesajlar', to: '/mesajlar' },
+  { label: 'Mesajlar', to: '/mesajlar', key: 'messages' as const },
   { label: 'Kaydedilenler', to: '/kaydedilenler' },
 ];
+
+const NOTIF_PREVIEW = 5;
 
 function initialsFromUser(displayName: string | null, email: string | null) {
   const name = (displayName || email || 'EV').trim();
@@ -32,31 +41,53 @@ function initialsFromUser(displayName: string | null, email: string | null) {
   );
 }
 
+function notifTarget(n: AppNotification): string | null {
+  if (n.conversationId) return `/mesajlar/${n.conversationId}`;
+  if (n.topicId) return `/forum/${n.topicId}`;
+  return null;
+}
+
 export function Header() {
   const { user, logOut, loading } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { hiddenIds } = useBlockLists();
   const navigate = useNavigate();
-  const [notifUnread, setNotifUnread] = useState(0);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [msgUnread, setMsgUnread] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [search, setSearch] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const notifUnread = notifications.filter((n) => !n.isRead).length;
+  const previewNotifs = notifications.slice(0, NOTIF_PREVIEW);
 
   useEffect(() => {
     if (!user) {
-      setNotifUnread(0);
+      setNotifications([]);
+      setMsgUnread(0);
       return;
     }
-    return subscribeUserNotifications(user.uid, (items) => {
-      setNotifUnread(items.filter((n) => !n.isRead).length);
+    const unsubNotif = subscribeUserNotifications(user.uid, setNotifications);
+    const unsubMsg = subscribeMyConversations(user.uid, (items) => {
+      const total = items
+        .filter((c) => !hiddenIds.has(c.peer.userId))
+        .reduce((sum, c) => sum + c.unread, 0);
+      setMsgUnread(total);
     });
-  }, [user]);
+    return () => {
+      unsubNotif();
+      unsubMsg();
+    };
+  }, [user, hiddenIds]);
 
   useEffect(() => {
     const onPointerDown = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
+      const target = e.target as Node;
+      if (!menuRef.current?.contains(target)) setMenuOpen(false);
+      if (!notifRef.current?.contains(target)) setNotifOpen(false);
     };
     document.addEventListener('mousedown', onPointerDown);
     return () => document.removeEventListener('mousedown', onPointerDown);
@@ -64,6 +95,7 @@ export function Header() {
 
   const openMenu = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
+    setNotifOpen(false);
     setMenuOpen(true);
   };
 
@@ -80,6 +112,16 @@ export function Header() {
       return;
     }
     navigate(`/ilanlar?q=${encodeURIComponent(q)}`);
+  };
+
+  const onOpenNotif = async (n: AppNotification) => {
+    setNotifOpen(false);
+    if (!n.isRead) {
+      await markNotificationRead(n.id).catch(() => undefined);
+    }
+    const to = notifTarget(n);
+    if (to) navigate(to);
+    else navigate('/bildirimler');
   };
 
   return (
@@ -143,20 +185,99 @@ export function Header() {
 
           {!loading && user ? (
             <>
-              <Link
-                to="/bildirimler"
-                aria-label={
-                  notifUnread > 0
-                    ? `${notifUnread} okunmamış bildirim`
-                    : 'Bildirimler'
-                }
-                className="relative grid h-11 w-11 place-items-center rounded-full text-ev-muted transition hover:bg-ev-primary-light hover:text-ev-primary"
-              >
-                <BellIcon />
-                {notifUnread > 0 ? (
-                  <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-ev-surface" />
+              <div ref={notifRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setNotifOpen((o) => !o);
+                  }}
+                  aria-expanded={notifOpen}
+                  aria-haspopup="menu"
+                  aria-label={
+                    notifUnread > 0
+                      ? `${notifUnread} okunmamış bildirim`
+                      : 'Bildirimler'
+                  }
+                  className={`relative grid h-11 w-11 place-items-center rounded-full transition ${
+                    notifOpen
+                      ? 'bg-ev-primary-light text-ev-primary'
+                      : 'text-ev-muted hover:bg-ev-primary-light hover:text-ev-primary'
+                  }`}
+                >
+                  <BellIcon />
+                  {notifUnread > 0 ? (
+                    <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-ev-surface" />
+                  ) : null}
+                </button>
+
+                {notifOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-50 mt-1.5 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-ev-border bg-ev-surface shadow-lg shadow-black/25"
+                  >
+                    <div className="flex items-center justify-between border-b border-ev-divider px-4 py-2.5">
+                      <div>
+                        <p className="text-sm font-extrabold text-ev-text">
+                          Bildirimler
+                        </p>
+                        <p className="text-[11px] text-ev-hint">
+                          {notifUnread > 0
+                            ? `${notifUnread} okunmamış`
+                            : 'Tümü okundu'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {previewNotifs.length === 0 ? (
+                      <p className="px-4 py-8 text-center text-sm text-ev-muted">
+                        Bildirim yok
+                      </p>
+                    ) : (
+                      <ul className="max-h-[22rem] overflow-y-auto py-1">
+                        {previewNotifs.map((n) => (
+                          <li key={n.id}>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => void onOpenNotif(n)}
+                              className={`block w-full px-4 py-2.5 text-left transition hover:bg-ev-bg ${
+                                n.isRead ? '' : 'bg-ev-primary-light/60'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-bold text-ev-text">
+                                  {n.title}
+                                </p>
+                                {!n.isRead ? (
+                                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ev-primary" />
+                                ) : null}
+                              </div>
+                              <p className="mt-0.5 line-clamp-2 text-xs text-ev-muted">
+                                {n.body}
+                              </p>
+                              <p className="mt-1 text-[11px] text-ev-hint">
+                                {timeAgo(n.time)}
+                              </p>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    <div className="border-t border-ev-divider p-2">
+                      <Link
+                        to="/bildirimler"
+                        role="menuitem"
+                        onClick={() => setNotifOpen(false)}
+                        className="block rounded-xl px-3 py-2.5 text-center text-sm font-extrabold text-ev-primary transition hover:bg-ev-primary-light"
+                      >
+                        Tümünü gör
+                      </Link>
+                    </div>
+                  </div>
                 ) : null}
-              </Link>
+              </div>
 
               <div
                 ref={menuRef}
@@ -166,13 +287,23 @@ export function Header() {
               >
                 <button
                   type="button"
-                  onClick={() => setMenuOpen((o) => !o)}
-                  className="grid h-11 w-11 place-items-center rounded-full bg-ev-primary text-xs font-extrabold text-white shadow-sm transition hover:bg-ev-primary-dark"
+                  onClick={() => {
+                    setNotifOpen(false);
+                    setMenuOpen((o) => !o);
+                  }}
+                  className="relative grid h-11 w-11 place-items-center rounded-full bg-ev-primary text-xs font-extrabold text-white shadow-sm transition hover:bg-ev-primary-dark"
                   aria-expanded={menuOpen}
                   aria-haspopup="menu"
-                  aria-label="Hesap menüsü"
+                  aria-label={
+                    msgUnread > 0
+                      ? `Hesap menüsü, ${msgUnread} okunmamış mesaj`
+                      : 'Hesap menüsü'
+                  }
                 >
                   {initialsFromUser(user.displayName, user.email)}
+                  {msgUnread > 0 ? (
+                    <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-ev-surface" />
+                  ) : null}
                 </button>
 
                 {menuOpen ? (
@@ -190,17 +321,26 @@ export function Header() {
                         {user.email}
                       </p>
                     </div>
-                    {ACCOUNT_MENU.map((item) => (
-                      <Link
-                        key={item.to}
-                        to={item.to}
-                        role="menuitem"
-                        onClick={() => setMenuOpen(false)}
-                        className="block px-4 py-2.5 text-left text-sm font-semibold text-ev-muted transition hover:bg-ev-bg hover:text-ev-text"
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
+                    {ACCOUNT_MENU.map((item) => {
+                      const isMessages =
+                        'key' in item && item.key === 'messages';
+                      return (
+                        <Link
+                          key={item.to}
+                          to={item.to}
+                          role="menuitem"
+                          onClick={() => setMenuOpen(false)}
+                          className="flex items-center justify-between gap-2 px-4 py-2.5 text-left text-sm font-semibold text-ev-muted transition hover:bg-ev-bg hover:text-ev-text"
+                        >
+                          <span>{item.label}</span>
+                          {isMessages && msgUnread > 0 ? (
+                            <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-white">
+                              {msgUnread > 99 ? '99+' : msgUnread}
+                            </span>
+                          ) : null}
+                        </Link>
+                      );
+                    })}
                     <div className="my-1 border-t border-ev-divider" />
                     <button
                       type="button"

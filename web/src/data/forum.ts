@@ -10,6 +10,40 @@ export const FORUM_CATEGORIES = [
   { id: 'meetup', label: 'Buluşma', emoji: '📍' },
 ] as const;
 
+export type ForumBrand = {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+};
+
+/** Popüler markalar — sidebar grid + filtre */
+export const FORUM_BRANDS: ForumBrand[] = [
+  { id: 'tesla', name: 'Tesla', emoji: '⚡', color: '#CC0000' },
+  { id: 'byd', name: 'BYD', emoji: '🔋', color: '#FF6B00' },
+  { id: 'bmw', name: 'BMW', emoji: '🔵', color: '#1C69D4' },
+  { id: 'mercedes', name: 'Mercedes', emoji: '⭐', color: '#1C1C1C' },
+  { id: 'renault', name: 'Renault', emoji: '💎', color: '#FFCC00' },
+  { id: 'volvo', name: 'Volvo', emoji: '🛡️', color: '#003057' },
+  { id: 'hyundai', name: 'Hyundai', emoji: '🅗', color: '#00287A' },
+  { id: 'kia', name: 'Kia', emoji: '🏁', color: '#05141F' },
+  { id: 'togg', name: 'Togg', emoji: '🇹🇷', color: '#2DC653' },
+  { id: 'mg', name: 'MG', emoji: '🅜', color: '#B00020' },
+  { id: 'vw', name: 'Volkswagen', emoji: '🚗', color: '#1B3A6B' },
+  { id: 'audi', name: 'Audi', emoji: '⬤', color: '#BB0A21' },
+];
+
+export const POPULAR_BRAND_IDS = [
+  'tesla',
+  'byd',
+  'bmw',
+  'mercedes',
+  'renault',
+  'volvo',
+  'hyundai',
+  'kia',
+] as const;
+
 export const CATEGORY_BADGE: Record<
   string,
   { label: string; className: string }
@@ -84,3 +118,22 @@ export function findCategory(categoryId: string) {
     FORUM_CATEGORIES.find((c) => c.id === categoryId) ?? FORUM_CATEGORIES[0]
   );
 }
+
+export function findBrand(brandId: string): ForumBrand | undefined {
+  return FORUM_BRANDS.find((b) => b.id === brandId);
+}
+
+export function formatCount(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
+}
+
+/** Marka filtresi: brandId veya başlık/özette marka adı */
+export function topicMatchesBrand(topic: ForumTopic, brandId: string): boolean {
+  if (!brandId || brandId === 'all') return true;
+  if (topic.brandId === brandId) return true;
+  const brand = findBrand(brandId);
+  if (!brand) return false;
+  const hay = `${topic.title} ${topic.excerpt}`.toLowerCase();
+  return hay.includes(brand.name.toLowerCase());
+}
+

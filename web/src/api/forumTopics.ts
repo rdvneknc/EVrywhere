@@ -124,6 +124,7 @@ export async function createForumTopic(
     title: string;
     excerpt: string;
     categoryId: string;
+    brandId?: string;
     /** Opsiyonel kapak görseli */
     photoFile?: File | null;
   },
@@ -152,6 +153,8 @@ export async function createForumTopic(
     );
   }
 
+  const brandId = input.brandId?.trim() || 'all';
+
   const payload: Record<string, unknown> = {
     title,
     excerpt,
@@ -160,7 +163,7 @@ export async function createForumTopic(
     authorColor: EV_PRIMARY,
     authorId: user.uid,
     categoryId: input.categoryId || 'general',
-    brandId: 'all',
+    brandId,
     replies: 0,
     views: 1,
     isPinned: false,

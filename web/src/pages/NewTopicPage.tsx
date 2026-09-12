@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
-import { FORUM_CATEGORIES } from '../data/forum';
+import { FORUM_BRANDS, FORUM_CATEGORIES } from '../data/forum';
 import { createForumTopic } from '../api/forumTopics';
 import { useAuth } from '../auth/AuthContext';
 
@@ -13,6 +13,7 @@ export function NewTopicPage() {
   const [title, setTitle] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [categoryId, setCategoryId] = useState('general');
+  const [brandId, setBrandId] = useState('all');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export function NewTopicPage() {
         title,
         excerpt,
         categoryId,
+        brandId,
         photoFile,
       });
       navigate(`/forum/${id}`);
@@ -99,6 +101,38 @@ export function NewTopicPage() {
                   }`}
                 >
                   {c.emoji} {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-ev-muted">
+              Marka (opsiyonel)
+            </label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setBrandId('all')}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                  brandId === 'all'
+                    ? 'bg-ev-primary text-white'
+                    : 'border border-ev-border bg-ev-surface text-ev-muted'
+                }`}
+              >
+                Genel
+              </button>
+              {FORUM_BRANDS.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => setBrandId(b.id)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                    brandId === b.id
+                      ? 'bg-ev-primary text-white'
+                      : 'border border-ev-border bg-ev-surface text-ev-muted'
+                  }`}
+                >
+                  {b.emoji} {b.name}
                 </button>
               ))}
             </div>

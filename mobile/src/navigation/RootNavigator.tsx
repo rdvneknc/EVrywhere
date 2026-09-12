@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -12,24 +12,39 @@ import { ChatScreen } from '../screens/ChatScreen';
 import { UserProfileScreen } from '../screens/UserProfileScreen';
 import { SavedTopicsScreen } from '../screens/SavedTopicsScreen';
 import { UserTopicsScreen } from '../screens/UserTopicsScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
 import { useAuth } from '../auth/AuthContext';
-import { EVColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
   const { user, loading } = useAuth();
+  const { colors, resolved } = useTheme();
+
+  const navTheme = {
+    ...(resolved === 'dark' ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(resolved === 'dark' ? DarkTheme.colors : DefaultTheme.colors),
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.surface,
+      text: colors.textPrimary,
+      border: colors.border,
+      notification: colors.error,
+    },
+  };
 
   if (loading) {
     return (
-      <View style={styles.boot}>
-        <ActivityIndicator size="large" color={EVColors.primary} />
+      <View style={[styles.boot, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
         {user ? (
           <>
@@ -65,6 +80,11 @@ export function RootNavigator() {
               options={{ animation: 'slide_from_right' }}
             />
             <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
               name="UserTopics"
               component={UserTopicsScreen}
               options={{ animation: 'slide_from_right' }}
@@ -83,6 +103,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: EVColors.background,
   },
 });

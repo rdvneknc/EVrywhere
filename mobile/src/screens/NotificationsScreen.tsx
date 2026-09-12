@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,13 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
-import { EVColors } from '../theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import {
   AppNotification,
   NotifType,
@@ -20,9 +23,9 @@ import {
   subscribeUserNotifications,
   timeAgo,
 } from '../api/notifications';
-import { hexWithAlpha } from '../data/forum';
 import { HeaderMessagesButton } from '../components/HeaderMessagesButton';
 import { useAuth } from '../auth/AuthContext';
+import { useNotificationPrefs } from '../notifications/NotificationPrefsContext';
 
 function styleFor(type: NotifType): {
   bg: string;
@@ -31,31 +34,39 @@ function styleFor(type: NotifType): {
 } {
   switch (type) {
     case 'priceDown':
-      return { bg: '#E8F9ED', fg: EVColors.primary, icon: 'arrow-down' };
+      return { bg: '#E8F9ED', fg: '#2DC653', icon: 'arrow-down' };
     case 'priceUp':
       return { bg: '#FFE5E5', fg: '#D94F3D', icon: 'arrow-up' };
     case 'forum':
-      return { bg: '#E8F0FC', fg: '#1C69D4', icon: 'chatbubbles' };
+      return { bg: '#E8F3FC', fg: '#1C69D4', icon: 'chatbubbles' };
     case 'message':
-      return { bg: '#E8F9ED', fg: EVColors.primary, icon: 'chatbubble-ellipses' };
+      return { bg: '#E8F9ED', fg: '#2DC653', icon: 'chatbubble-ellipses' };
     case 'system':
       return { bg: '#FFF3E0', fg: '#EF9F27', icon: 'information-circle' };
   }
 }
 
 export function NotificationsScreen() {
+  const { colors, styles } = useStyles();
+  const { resolved } = useTheme();
+  const { inAppEnabled } = useNotificationPrefs();
   const { user } = useAuth();
+  const fadeColors =
+    resolved === 'dark'
+      ? (['#143221', '#122018', '#0B1410', '#0B1410'] as const)
+      : (['#D8F5E2', '#E8F9ED', '#F5FBF7', '#FFFFFF'] as const);
   const [notifs, setNotifs] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const hasUnread = notifs.some((n) => !n.isRead);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !inAppEnabled) {
       setNotifs([]);
       setLoading(false);
       return;
     }
+    setLoading(true);
     return subscribeUserNotifications(
       user.uid,
       (items) => {
@@ -64,7 +75,7 @@ export function NotificationsScreen() {
       },
       () => setLoading(false),
     );
-  }, [user]);
+  }, [user, inAppEnabled]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -72,19 +83,47 @@ export function NotificationsScreen() {
     setRefreshing(false);
   };
 
+  const openQuickActions = () => {
+    if (!user || !inAppEnabled) return;
+    Alert.alert('Bildirimler', undefined, [
+      hasUnread
+        ? {
+            text: 'Tümünü okundu işaretle',
+            onPress: () => void markAllNotificationsRead(user.uid),
+          }
+        : {
+            text: 'Okunmamış bildirim yok',
+            style: 'cancel',
+          },
+      { text: 'Kapat', style: 'cancel' },
+    ]);
+  };
+
   return (
     <View style={styles.root}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={[...fadeColors]}
+        locations={[0, 0.28, 0.62, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.bgFade}
+      />
+      <View pointerEvents="none" style={styles.decorA} />
+      <View pointerEvents="none" style={styles.decorB} />
+
       <ScrollView
         contentContainerStyle={
-          notifs.length === 0 ? styles.flexGrow : styles.listPad
+          !inAppEnabled || notifs.length === 0 ? styles.flexGrow : styles.listPad
         }
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => void onRefresh()}
-            tintColor={EVColors.primary}
-            colors={[EVColors.primary]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            enabled={inAppEnabled}
           />
         }
       >
@@ -92,25 +131,33 @@ export function NotificationsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Bildirimler</Text>
             <Text style={styles.subtitle}>
-              Forum yanıtları ve mesajların
+              {inAppEnabled
+                ? 'Forum yanıtları ve mesajların'
+                : 'Uygulama içi bildirimler kapalı'}
             </Text>
           </View>
-          <View style={styles.headerActions}>
-            <HeaderMessagesButton compact />
-            {hasUnread && user ? (
-              <Pressable
-                onPress={() => void markAllNotificationsRead(user.uid)}
-                style={styles.markAll}
-              >
-                <Text style={styles.markAllText}>Tümünü oku</Text>
-              </Pressable>
-            ) : null}
-          </View>
+          <HeaderMessagesButton compact />
         </View>
 
-        {loading ? (
+        {!inAppEnabled ? (
           <View style={styles.empty}>
-            <ActivityIndicator size="large" color={EVColors.primary} />
+            <View style={styles.emptyIcon}>
+              <Ionicons
+                name="notifications-off-outline"
+                size={36}
+                color={colors.textHint}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>Bildirimler kapalı</Text>
+            <Text style={styles.emptyBody}>
+              {
+                'Açmak için Profil → Ayarlar →\nUygulama içi bildirimler'
+              }
+            </Text>
+          </View>
+        ) : loading ? (
+          <View style={styles.empty}>
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : notifs.length === 0 ? (
           <View style={styles.empty}>
@@ -118,25 +165,34 @@ export function NotificationsScreen() {
               <Ionicons
                 name="notifications-outline"
                 size={36}
-                color={EVColors.primary}
+                color={colors.primary}
               />
             </View>
             <Text style={styles.emptyTitle}>Henüz bildirim yok</Text>
             <Text style={styles.emptyBody}>
-              {
-                'Konuna yorum veya sana mesaj gelince\nburada görünecek'
-              }
+              {'Konuna yorum veya sana mesaj gelince\nburada görünecek'}
             </Text>
           </View>
         ) : (
           notifs.map((n) => <NotifCard key={n.id} notif={n} />)
         )}
       </ScrollView>
+
+      {user && inAppEnabled ? (
+        <Pressable
+          style={styles.fab}
+          onPress={openQuickActions}
+          accessibilityLabel="Bildirim işlemleri"
+        >
+          <Ionicons name="settings" size={22} color="#fff" />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
 function NotifCard({ notif }: { notif: AppNotification }) {
+  const { colors, styles } = useStyles();
   const { bg, fg, icon } = styleFor(notif.type);
 
   return (
@@ -152,27 +208,21 @@ function NotifCard({ notif }: { notif: AppNotification }) {
       )}
     >
       <Pressable
-        style={[
-          styles.card,
-          !notif.isRead && {
-            borderColor: EVColors.primaryMid,
-            backgroundColor: hexWithAlpha(EVColors.primary, 0.04),
-          },
-        ]}
+        style={styles.card}
         onPress={() => {
           if (!notif.isRead) void markNotificationRead(notif.id);
         }}
       >
-        <View style={[styles.iconWrap, { backgroundColor: bg }]}>
-          <Ionicons name={icon} size={20} color={fg} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <View style={styles.cardTop}>
-            <Text style={styles.cardTitle} numberOfLines={1}>
-              {notif.title}
-            </Text>
-            {!notif.isRead ? <View style={styles.dot} /> : null}
+        <View style={styles.iconStack}>
+          <View style={[styles.iconWrap, { backgroundColor: bg }]}>
+            <Ionicons name={icon} size={20} color={fg} />
           </View>
+          {!notif.isRead ? <View style={styles.unreadDot} /> : null}
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {notif.title}
+          </Text>
           <Text style={styles.cardBody} numberOfLines={2}>
             {notif.body}
           </Text>
@@ -183,44 +233,61 @@ function NotifCard({ notif }: { notif: AppNotification }) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: EVColors.background },
-  flexGrow: { flexGrow: 1, paddingBottom: 100 },
-  listPad: { paddingBottom: 100, paddingTop: 0 },
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.background },
+  bgFade: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: '100%',
+    height: '58%',
+  },
+  decorA: {
+    position: 'absolute',
+    right: -30,
+    top: 20,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(45, 198, 83, 0.10)',
+  },
+  decorB: {
+    position: 'absolute',
+    right: 40,
+    top: 70,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(45, 198, 83, 0.08)',
+  },
+  flexGrow: { flexGrow: 1, paddingBottom: 110 },
+  listPad: { paddingBottom: 110, paddingTop: 0 },
   header: {
     paddingHorizontal: 20,
     paddingTop: 4,
+    paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 8,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
-    color: EVColors.textPrimary,
-    letterSpacing: -0.5,
+    color: c.textPrimary,
+    letterSpacing: -0.6,
   },
   subtitle: {
-    marginTop: 2,
+    marginTop: 3,
     fontSize: 13,
-    color: EVColors.textSecondary,
-  },
-  markAll: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: EVColors.primaryLight,
-  },
-  markAllText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: EVColors.primary,
+    color: c.textSecondary,
+    fontWeight: '500',
   },
   empty: {
     flex: 1,
@@ -233,7 +300,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 20,
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -241,68 +308,92 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 17,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   emptyBody: {
     marginTop: 8,
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
   },
   card: {
     marginHorizontal: 16,
     marginTop: 10,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: EVColors.surface,
-    borderWidth: 1,
-    borderColor: EVColors.border,
+    padding: 16,
+    borderRadius: 22,
+    backgroundColor: c.surface,
     flexDirection: 'row',
-    gap: 12,
+    gap: 14,
+    shadowColor: '#0D1B12',
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  iconStack: {
+    position: 'relative',
   },
   iconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  unreadDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: c.primary,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   cardTitle: {
-    flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: EVColors.textPrimary,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: EVColors.primary,
+    color: c.textPrimary,
+    letterSpacing: -0.2,
   },
   cardBody: {
     marginTop: 4,
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     lineHeight: 18,
   },
   cardTime: {
-    marginTop: 6,
+    marginTop: 8,
     fontSize: 11,
-    color: EVColors.textHint,
+    color: c.textHint,
+    fontWeight: '500',
   },
   deleteAction: {
-    backgroundColor: EVColors.error,
+    backgroundColor: c.error,
     justifyContent: 'center',
     alignItems: 'center',
     width: 72,
     marginTop: 10,
     marginRight: 16,
-    borderRadius: 16,
+    borderRadius: 22,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 18,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#3B82F6',
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
 });
+}

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { EVColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { EVColorPalette } from '../theme/colors';
 
 export type NavKey = 'forum' | 'charging' | 'marketplace' | 'notifications' | 'profile';
 
@@ -27,6 +28,8 @@ type Props = {
 
 export function BottomNav({ currentIndex, onTap, unreadCount = 0 }: Props) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
     <View
@@ -55,7 +58,7 @@ export function BottomNav({ currentIndex, onTap, unreadCount = 0 }: Props) {
                   <Ionicons
                     name={active ? item.icon : item.iconOutline}
                     size={22}
-                    color={active ? EVColors.primary : EVColors.textHint}
+                    color={active ? colors.primary : colors.textHint}
                   />
                 </View>
                 {showBadge ? <View style={styles.badge} /> : null}
@@ -65,7 +68,7 @@ export function BottomNav({ currentIndex, onTap, unreadCount = 0 }: Props) {
                   styles.label,
                   {
                     fontWeight: active ? '600' : '400',
-                    color: active ? EVColors.primary : EVColors.textHint,
+                    color: active ? colors.primary : colors.textHint,
                   },
                 ]}
               >
@@ -79,48 +82,50 @@ export function BottomNav({ currentIndex, onTap, unreadCount = 0 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    backgroundColor: EVColors.surface,
-    borderTopWidth: 1,
-    borderTopColor: EVColors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 8,
-  },
-  row: {
-    height: 60,
-    flexDirection: 'row',
-  },
-  item: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconStack: {
-    position: 'relative',
-  },
-  iconPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  iconPillActive: {
-    backgroundColor: EVColors.primaryLight,
-  },
-  badge: {
-    position: 'absolute',
-    right: 6,
-    top: 2,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: EVColors.error,
-  },
-  label: {
-    marginTop: 2,
-    fontSize: 10,
-  },
-});
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+    wrap: {
+      backgroundColor: c.surface,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.divider,
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: -3 },
+      elevation: 10,
+    },
+    row: {
+      height: 62,
+      flexDirection: 'row',
+    },
+    item: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconStack: {
+      position: 'relative',
+    },
+    iconPill: {
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 14,
+    },
+    iconPillActive: {
+      backgroundColor: c.primaryLight,
+    },
+    badge: {
+      position: 'absolute',
+      right: 6,
+      top: 2,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: c.error,
+    },
+    label: {
+      marginTop: 2,
+      fontSize: 10,
+    },
+  });
+}

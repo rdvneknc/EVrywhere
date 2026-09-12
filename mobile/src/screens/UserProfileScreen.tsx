@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { RootStackParamList } from '../navigation/types';
 import { hexWithAlpha } from '../data/forum';
 import { useAuth } from '../auth/AuthContext';
@@ -34,6 +35,7 @@ import { promptReport } from '../lib/reportPrompt';
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
 export function UserProfileScreen({ navigation, route }: Props) {
+  const { colors, styles } = useStyles();
   const { userId, name, initials, color, contextTitle } = route.params;
   const { user } = useAuth();
   const [opening, setOpening] = useState(false);
@@ -187,7 +189,7 @@ export function UserProfileScreen({ navigation, route }: Props) {
           <Ionicons
             name="chevron-back"
             size={22}
-            color={EVColors.textPrimary}
+            color={colors.textPrimary}
           />
         </Pressable>
         <Text style={styles.topTitle}>Üye profili</Text>
@@ -210,13 +212,13 @@ export function UserProfileScreen({ navigation, route }: Props) {
         </View>
         <Text style={styles.name}>{displayName}</Text>
         <View style={styles.badge}>
-          <Ionicons name="flash" size={12} color={EVColors.primary} />
+          <Ionicons name="flash" size={12} color={colors.primary} />
           <Text style={styles.badgeText}>EV Sürücüsü</Text>
         </View>
 
         {loading ? (
           <ActivityIndicator
-            color={EVColors.primary}
+            color={colors.primary}
             style={{ marginTop: 28 }}
           />
         ) : contentHidden ? (
@@ -281,7 +283,7 @@ export function UserProfileScreen({ navigation, route }: Props) {
               <Ionicons
                 name="swap-horizontal"
                 size={16}
-                color={EVColors.primary}
+                color={colors.primary}
               />
               <Text style={styles.listingStatText}>
                 {profile?.listingCount ?? 0} aktif 2. el ilanı
@@ -330,13 +332,13 @@ export function UserProfileScreen({ navigation, route }: Props) {
                   <Ionicons
                     name={iBlocked ? 'lock-open-outline' : 'ban-outline'}
                     size={16}
-                    color={iBlocked ? EVColors.primary : EVColors.error}
+                    color={iBlocked ? colors.primary : colors.error}
                   />
                   <Text
                     style={[
                       styles.modBtnText,
                       {
-                        color: iBlocked ? EVColors.primary : EVColors.error,
+                        color: iBlocked ? colors.primary : colors.error,
                       },
                     ]}
                   >
@@ -358,9 +360,9 @@ export function UserProfileScreen({ navigation, route }: Props) {
                   <Ionicons
                     name="flag-outline"
                     size={16}
-                    color={EVColors.textHint}
+                    color={colors.textHint}
                   />
-                  <Text style={[styles.modBtnText, { color: EVColors.textHint }]}>
+                  <Text style={[styles.modBtnText, { color: colors.textHint }]}>
                     Şikayet et
                   </Text>
                 </Pressable>
@@ -387,16 +389,17 @@ function Stat({
   value: string;
   onPress?: () => void;
 }) {
+  const { colors, styles } = useStyles();
   const content = (
     <>
-      <Ionicons name={icon} size={16} color={EVColors.primary} />
+      <Ionicons name={icon} size={16} color={colors.primary} />
       <Text style={styles.statValue} numberOfLines={2}>
         {value}
       </Text>
       <Text
         style={[
           styles.statLabel,
-          onPress ? { color: EVColors.primary, fontWeight: '600' } : null,
+          onPress ? { color: colors.primary, fontWeight: '600' } : null,
         ]}
       >
         {label}
@@ -416,8 +419,15 @@ function Stat({
   return <View style={styles.statCol}>{content}</View>;
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: EVColors.background },
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -428,7 +438,7 @@ const styles = StyleSheet.create({
   topTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   body: {
     alignItems: 'center',
@@ -449,7 +459,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 24,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     letterSpacing: -0.4,
   },
   badge: {
@@ -460,17 +470,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
   },
   badgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: EVColors.primary,
+    color: c.primary,
   },
   bio: {
     marginTop: 14,
     fontSize: 14,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 8,
@@ -483,29 +493,29 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   garageTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   garageMeta: {
     marginTop: 2,
     fontSize: 12,
-    color: EVColors.textHint,
+    color: c.textHint,
   },
   statsCard: {
     marginTop: 24,
     width: '100%',
     flexDirection: 'row',
     alignItems: 'stretch',
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     paddingVertical: 16,
     paddingHorizontal: 8,
   },
@@ -518,12 +528,12 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
   },
   listingStatText: {
     fontSize: 13,
     fontWeight: '600',
-    color: EVColors.primary,
+    color: c.primary,
   },
   statCol: {
     flex: 1,
@@ -533,24 +543,24 @@ const styles = StyleSheet.create({
   },
   statDiv: {
     width: 1,
-    backgroundColor: EVColors.divider,
+    backgroundColor: c.divider,
     marginVertical: 4,
   },
   statValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     textAlign: 'center',
   },
   statLabel: {
     fontSize: 11,
-    color: EVColors.textHint,
+    color: c.textHint,
     fontWeight: '500',
   },
   context: {
     marginTop: 16,
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -559,7 +569,7 @@ const styles = StyleSheet.create({
     minWidth: 200,
     height: 48,
     borderRadius: 24,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -585,7 +595,7 @@ const styles = StyleSheet.create({
   selfHint: {
     marginTop: 28,
     fontSize: 14,
-    color: EVColors.textHint,
+    color: c.textHint,
   },
   blockHint: {
     textAlign: 'center',
@@ -602,9 +612,10 @@ const styles = StyleSheet.create({
   blockBodyHint: {
     marginTop: 20,
     textAlign: 'center',
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     paddingHorizontal: 12,
   },
 });
+}

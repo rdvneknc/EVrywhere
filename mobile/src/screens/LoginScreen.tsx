@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { EVLogoIcon } from '../components/EVLogoIcon';
 import { EVPrimaryButton } from '../components/EVPrimaryButton';
 import { useAuth } from '../auth/AuthContext';
@@ -22,6 +23,7 @@ import { useAuth } from '../auth/AuthContext';
 type Mode = 'login' | 'register';
 
 export function LoginScreen() {
+  const { colors, styles } = useStyles();
   const { signIn, signUp, resetPassword } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
@@ -108,7 +110,7 @@ export function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor={EVColors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -145,14 +147,14 @@ export function LoginScreen() {
                 <Ionicons
                   name="person-outline"
                   size={18}
-                  color={EVColors.textHint}
+                  color={colors.textHint}
                 />
                 <TextInput
                   style={styles.input}
                   value={name}
                   onChangeText={setName}
                   placeholder="Ad Soyad (isteğe bağlı)"
-                  placeholderTextColor={EVColors.textHint}
+                  placeholderTextColor={colors.textHint}
                   autoCapitalize="words"
                 />
               </View>
@@ -162,14 +164,14 @@ export function LoginScreen() {
               <Ionicons
                 name="mail-outline"
                 size={18}
-                color={EVColors.textHint}
+                color={colors.textHint}
               />
               <TextInput
                 style={styles.input}
                 value={email}
                 onChangeText={setEmail}
                 placeholder="E-posta"
-                placeholderTextColor={EVColors.textHint}
+                placeholderTextColor={colors.textHint}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -180,14 +182,14 @@ export function LoginScreen() {
               <Ionicons
                 name="lock-closed-outline"
                 size={18}
-                color={EVColors.textHint}
+                color={colors.textHint}
               />
               <TextInput
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Şifre (min. 6 karakter)"
-                placeholderTextColor={EVColors.textHint}
+                placeholderTextColor={colors.textHint}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
               />
@@ -198,7 +200,7 @@ export function LoginScreen() {
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={18}
-                  color={EVColors.textHint}
+                  color={colors.textHint}
                 />
               </Pressable>
             </View>
@@ -252,10 +254,17 @@ export function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
   },
   flex: { flex: 1 },
   scroll: {
@@ -275,34 +284,34 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.5,
   },
-  brandEv: { color: EVColors.primary },
-  brandRest: { color: EVColors.textPrimary },
+  brandEv: { color: c.primary },
+  brandRest: { color: c.textPrimary },
   tagline: {
     marginTop: 6,
     fontSize: 15,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     letterSpacing: 0.2,
   },
   heading: {
     fontSize: 26,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     letterSpacing: -0.4,
   },
   subheading: {
     marginTop: 6,
     marginBottom: 24,
     fontSize: 15,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     lineHeight: 21,
   },
   fieldWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     borderRadius: 16,
     paddingHorizontal: 14,
     marginBottom: 12,
@@ -311,7 +320,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '500',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     paddingVertical: 16,
   },
   switchMode: {
@@ -327,14 +336,14 @@ const styles = StyleSheet.create({
   forgotText: {
     fontSize: 13,
     fontWeight: '600',
-    color: EVColors.primary,
+    color: c.primary,
   },
   switchText: {
     fontSize: 14,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
   },
   switchLink: {
-    color: EVColors.primary,
+    color: c.primary,
     fontWeight: '700',
   },
   footer: {
@@ -345,13 +354,14 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
-    color: EVColors.textHint,
+    color: c.textHint,
     textAlign: 'center',
     lineHeight: 19,
   },
   footerLink: {
-    color: EVColors.primary,
+    color: c.primary,
     fontWeight: '500',
     textDecorationLine: 'underline',
   },
 });
+}

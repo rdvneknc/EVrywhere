@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
@@ -9,17 +9,42 @@ import { useAuth } from '../auth/AuthContext';
 export function NewTopicPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [categoryId, setCategoryId] = useState('general');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const previewUrl = useMemo(
+    () => (photoFile ? URL.createObjectURL(photoFile) : null),
+    [photoFile],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/giris?next=/forum/yeni', { replace: true });
     }
   }, [user, authLoading, navigate]);
+
+  const onPickPhoto = (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Sadece görsel dosyası seçebilirsin.');
+      return;
+    }
+    setError(null);
+    setPhotoFile(file);
+    if (fileRef.current) fileRef.current.value = '';
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -31,6 +56,7 @@ export function NewTopicPage() {
         title,
         excerpt,
         categoryId,
+        photoFile,
       });
       navigate(`/forum/${id}`);
     } catch (err) {
@@ -100,6 +126,50 @@ export function NewTopicPage() {
               placeholder="Detayları paylaş…"
             />
           </div>
+
+          <div>
+            <label className="text-xs font-bold text-ev-muted">
+              Fotoğraf (opsiyonel)
+            </label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => onPickPhoto(e.target.files)}
+            />
+            {previewUrl ? (
+              <div className="relative mt-2 overflow-hidden rounded-2xl border border-ev-border bg-ev-surface">
+                <img
+                  src={previewUrl}
+                  alt="Konu görseli önizleme"
+                  className="max-h-56 w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPhotoFile(null)}
+                  className="absolute right-3 top-3 rounded-full bg-black/55 px-3 py-1.5 text-xs font-bold text-white"
+                >
+                  Kaldır
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="mt-2 flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ev-primary-mid bg-ev-primary-light/50 px-4 py-8 text-sm font-semibold text-ev-primary hover:bg-ev-primary-light"
+              >
+                <span className="text-2xl" aria-hidden>
+                  🖼️
+                </span>
+                Galeriden seç
+              </button>
+            )}
+            <p className="mt-2 text-[11px] text-ev-muted">
+              Görsel otomatik sıkıştırılır (mobil ile aynı limit).
+            </p>
+          </div>
+
           {error ? (
             <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
               {error}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { RootStackParamList } from '../navigation/types';
 import { hexWithAlpha } from '../data/forum';
 import { useAuth } from '../auth/AuthContext';
@@ -25,6 +26,7 @@ import { useBlockLists } from '../hooks/useBlockLists';
 type Props = NativeStackScreenProps<RootStackParamList, 'Messages'>;
 
 export function MessagesScreen({ navigation }: Props) {
+  const { colors, styles } = useStyles();
   const { user } = useAuth();
   const { blockedByIds, blockedIds } = useBlockLists();
   const [conversations, setConversations] = useState<ConversationSummary[]>(
@@ -67,7 +69,7 @@ export function MessagesScreen({ navigation }: Props) {
           <Ionicons
             name="chevron-back"
             size={22}
-            color={EVColors.textPrimary}
+            color={colors.textPrimary}
           />
         </Pressable>
         <View style={{ flex: 1 }}>
@@ -78,7 +80,7 @@ export function MessagesScreen({ navigation }: Props) {
 
       {loading ? (
         <View style={styles.empty}>
-          <ActivityIndicator size="large" color={EVColors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : visibleConversations.length === 0 ? (
         <ScrollView
@@ -87,8 +89,8 @@ export function MessagesScreen({ navigation }: Props) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => void onRefresh()}
-              tintColor={EVColors.primary}
-              colors={[EVColors.primary]}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
         >
@@ -96,7 +98,7 @@ export function MessagesScreen({ navigation }: Props) {
             <Ionicons
               name="chatbubble-ellipses-outline"
               size={30}
-              color={EVColors.primary}
+              color={colors.primary}
             />
           </View>
           <Text style={styles.emptyTitle}>Henüz mesajın yok</Text>
@@ -114,8 +116,8 @@ export function MessagesScreen({ navigation }: Props) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => void onRefresh()}
-              tintColor={EVColors.primary}
-              colors={[EVColors.primary]}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
         >
@@ -179,8 +181,15 @@ export function MessagesScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: EVColors.background },
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -191,13 +200,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     letterSpacing: -0.4,
   },
   subtitle: {
     marginTop: 2,
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
   },
   list: { paddingHorizontal: 20, paddingBottom: 32, gap: 10 },
   empty: {
@@ -211,7 +220,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 18,
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -219,12 +228,12 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 16,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   emptyBody: {
     marginTop: 6,
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
   },
@@ -233,9 +242,9 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   avatar: {
     width: 46,
@@ -247,7 +256,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 14,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   blockedTag: {
     marginTop: 2,
@@ -258,15 +267,15 @@ const styles = StyleSheet.create({
   listing: {
     marginTop: 2,
     fontSize: 11,
-    color: EVColors.primary,
+    color: c.primary,
     fontWeight: '500',
   },
   preview: {
     marginTop: 3,
     fontSize: 12,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
   },
-  time: { fontSize: 11, color: EVColors.textHint },
+  time: { fontSize: 11, color: c.textHint },
   unread: {
     marginTop: 4,
     minWidth: 20,
@@ -279,3 +288,4 @@ const styles = StyleSheet.create({
   },
   unreadText: { fontSize: 10, fontWeight: '800', color: '#fff' },
 });
+}

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { RootStackParamList } from '../navigation/types';
 import {
   CATEGORY_BADGE,
@@ -26,6 +27,7 @@ import { fetchForumTopicsByAuthor } from '../api/forumTopics';
 type Props = NativeStackScreenProps<RootStackParamList, 'UserTopics'>;
 
 export function UserTopicsScreen({ navigation, route }: Props) {
+  const { colors, styles } = useStyles();
   const { userId, name } = route.params;
   const [topics, setTopics] = useState<ForumTopic[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,7 @@ export function UserTopicsScreen({ navigation, route }: Props) {
           <Ionicons
             name="chevron-back"
             size={22}
-            color={EVColors.textPrimary}
+            color={colors.textPrimary}
           />
         </Pressable>
         <View style={styles.topTitles}>
@@ -84,14 +86,14 @@ export function UserTopicsScreen({ navigation, route }: Props) {
               setRefreshing(true);
               void load();
             }}
-            tintColor={EVColors.primary}
-            colors={[EVColors.primary]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
         {loading ? (
           <ActivityIndicator
-            color={EVColors.primary}
+            color={colors.primary}
             style={{ marginTop: 40 }}
           />
         ) : error ? (
@@ -103,7 +105,7 @@ export function UserTopicsScreen({ navigation, route }: Props) {
             <Ionicons
               name="document-text-outline"
               size={40}
-              color={EVColors.primary}
+              color={colors.primary}
             />
             <Text style={styles.emptyTitle}>Henüz konu yok</Text>
             <Text style={styles.emptyBody}>
@@ -156,7 +158,7 @@ export function UserTopicsScreen({ navigation, route }: Props) {
                 <Ionicons
                   name="chevron-forward"
                   size={18}
-                  color={EVColors.textHint}
+                  color={colors.textHint}
                 />
               </Pressable>
             );
@@ -167,8 +169,15 @@ export function UserTopicsScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: EVColors.background },
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -181,12 +190,12 @@ const styles = StyleSheet.create({
   topTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   topSub: {
     marginTop: 1,
     fontSize: 12,
-    color: EVColors.textHint,
+    color: c.textHint,
   },
   list: { paddingHorizontal: 16, paddingBottom: 24 },
   emptyScroll: { flexGrow: 1 },
@@ -201,12 +210,12 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 17,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   emptyBody: {
     marginTop: 8,
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
   },
@@ -217,15 +226,15 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
     borderRadius: 16,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   thumb: {
     width: 64,
     height: 64,
     borderRadius: 12,
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
   },
   thumbPlaceholder: {
     width: 64,
@@ -245,12 +254,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     lineHeight: 19,
   },
   meta: {
     marginTop: 4,
     fontSize: 12,
-    color: EVColors.textHint,
+    color: c.textHint,
   },
 });
+}

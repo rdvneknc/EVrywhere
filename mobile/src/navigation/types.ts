@@ -16,6 +16,7 @@ export type RootStackParamList = {
     contextTitle?: string;
   };
   SavedTopics: undefined;
+  Settings: undefined;
   UserTopics: {
     userId: string;
     name: string;

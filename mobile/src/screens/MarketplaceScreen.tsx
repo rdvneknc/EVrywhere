@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { RootStackParamList } from '../navigation/types';
 import {
   DEFAULT_FILTER,
@@ -43,6 +44,7 @@ import { useAuth } from '../auth/AuthContext';
 import { createListing, fetchListings, subscribeListings } from '../api/listings';
 import { createNotification } from '../api/notifications';
 import { useBlockLists } from '../hooks/useBlockLists';
+import { HeroBanner } from '../components/HeroBanner';
 import {
   compressImageUnderBytes,
   FIRESTORE_PHOTO_BYTES,
@@ -57,17 +59,30 @@ import {
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+const MARKET_HERO = require('../../assets/forum-hero.jpg');
+
+const FEATURED_BRAND_IDS = [
+  'togg',
+  'tesla',
+  'byd',
+  'bmw',
+  'hyundai',
+  'mg',
+] as const;
+
 const CURRENT_YEAR = new Date().getFullYear();
 const LISTING_YEARS = Array.from({ length: CURRENT_YEAR - 2010 + 1 }, (_, i) =>
   String(CURRENT_YEAR - i),
 );
 
 export function MarketplaceScreen() {
+  const { colors, styles } = useStyles();
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
   const { hiddenIds } = useBlockLists();
   const { width } = useWindowDimensions();
-  const cardW = (width - 40 - 12) / 2;
+  const cardW = (width - 32 - 12) / 2;
+  const searchRef = useRef<TextInput>(null);
 
   const [brand, setBrand] = useState<EvBrand | null>(null);
   const [model, setModel] = useState('Tümü');
@@ -76,6 +91,7 @@ export function MarketplaceScreen() {
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [showNewListing, setShowNewListing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [dbListings, setDbListings] = useState<EvListing[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [, setFollowTick] = useState(0);
@@ -94,23 +110,45 @@ export function MarketplaceScreen() {
     }
   };
 
+  const featuredBrands = useMemo(() => {
+    const byId = new Map(EV_BRANDS.map((b) => [b.id, b]));
+    return FEATURED_BRAND_IDS.map((id) => byId.get(id)).filter(
+      (b): b is EvBrand => Boolean(b),
+    );
+  }, []);
+
   const listings = useMemo(() => {
     if (!brand) return [];
+    const q = searchQuery.trim().toLowerCase();
     const fromDb = dbListings.filter(
       (l) =>
         (!l.sellerUserId || !hiddenIds.has(l.sellerUserId)) &&
         l.brandId === brand.id &&
-        (model === 'Tümü' || l.model === model),
+        (model === 'Tümü' || l.model === model) &&
+        (!q ||
+          l.model.toLowerCase().includes(q) ||
+          l.location.toLowerCase().includes(q) ||
+          String(l.year).includes(q)),
     );
     return filterListings(fromDb, filter).slice(0, 24);
-  }, [brand, model, filter, dbListings, hiddenIds]);
+  }, [brand, model, filter, dbListings, hiddenIds, searchQuery]);
 
   const vitrin = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return dbListings
-      .filter((l) => !l.sellerUserId || !hiddenIds.has(l.sellerUserId))
+      .filter(
+        (l) =>
+          (!l.sellerUserId || !hiddenIds.has(l.sellerUserId)) &&
+          (!q ||
+            l.model.toLowerCase().includes(q) ||
+            l.location.toLowerCase().includes(q) ||
+            (EV_BRANDS.find((b) => b.id === l.brandId)?.name ?? '')
+              .toLowerCase()
+              .includes(q)),
+      )
       .slice(0, 14);
-  }, [dbListings, hiddenIds]);
-  const accent = brand?.color ?? EVColors.primary;
+  }, [dbListings, hiddenIds, searchQuery]);
+  const accent = brand?.color ?? colors.primary;
   const activeFilter = isFilterActive(filter);
 
   const goBack = () => {
@@ -128,95 +166,200 @@ export function MarketplaceScreen() {
     navigation.navigate('ListingDetail', { listing });
   };
 
+  const selectBrand = (b: EvBrand) => {
+    setBrand(b);
+    setModel('Tümü');
+    setFilter(DEFAULT_FILTER);
+  };
+
   return (
     <View style={styles.root}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={[styles.scroll, { paddingBottom: 100 }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => void onRefresh()}
-            tintColor={EVColors.primary}
-            colors={[EVColors.primary]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
-        <View style={styles.appBar}>
+        <View style={styles.topBar}>
           {brand ? (
-            <Pressable onPress={goBack} style={styles.backBtn}>
+            <Pressable onPress={goBack} style={styles.iconBtn}>
               <Ionicons
                 name="arrow-back"
                 size={18}
-                color={EVColors.textPrimary}
+                color={colors.primary}
               />
             </Pressable>
-          ) : null}
-          <View style={{ flex: 1 }}>
+          ) : (
+            <View style={styles.logoMark}>
+              <Ionicons name="flash" size={16} color="#fff" />
+            </View>
+          )}
+          <View style={styles.brandBlock}>
             {brand == null ? (
-              <Text style={styles.brandTitle}>
-                <Text style={{ color: EVColors.primary }}>2. El </Text>
-                <Text style={{ color: EVColors.textPrimary }}>EV</Text>
-              </Text>
-            ) : (
-              <Text style={styles.brandTitleSmall} numberOfLines={1}>
-                {model === 'Tümü' ? brand.name : `${brand.name} · ${model}`}
-              </Text>
-            )}
-            <Text style={styles.subtitle}>
-              {brand == null
-                ? 'Topluluktan güvenilir ilanlar'
-                : model === 'Tümü'
-                  ? 'Model seç veya tümünü gör'
-                  : `${listings.length} ilan`}
-            </Text>
-          </View>
-          <View style={styles.appBarActions}>
-            <HeaderMessagesButton compact />
-            {brand && listings.length > 0 ? (
-              <Pressable
-                onPress={() => setShowFilter(true)}
-                style={[
-                  styles.filterBtn,
-                  {
-                    backgroundColor: activeFilter
-                      ? accent
-                      : EVColors.surface,
-                    borderColor: accent,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="options-outline"
-                  size={16}
-                  color={activeFilter ? '#fff' : accent}
-                />
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: activeFilter ? '#fff' : accent,
-                  }}
-                >
-                  Filtre
+              <>
+                <Text style={styles.brandName}>
+                  <Text style={{ color: colors.primary }}>EV</Text>rywhere
                 </Text>
+                <Text style={styles.brandTagline}>Daha temiz yarınlar için</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.brandNameSmall} numberOfLines={1}>
+                  {model === 'Tümü' ? brand.name : `${brand.name} · ${model}`}
+                </Text>
+                <Text style={styles.brandTagline}>
+                  {model === 'Tümü'
+                    ? 'Model seç veya tümünü gör'
+                    : `${listings.length} ilan`}
+                </Text>
+              </>
+            )}
+          </View>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => searchRef.current?.focus()}
+            hitSlop={6}
+          >
+            <Ionicons name="search" size={18} color={colors.primary} />
+          </Pressable>
+          <HeaderMessagesButton compact />
+          {brand && listings.length > 0 ? (
+            <Pressable
+              onPress={() => setShowFilter(true)}
+              style={[
+                styles.filterPill,
+                {
+                  backgroundColor: activeFilter ? accent : colors.primaryLight,
+                  borderColor: activeFilter ? accent : colors.primaryMid,
+                },
+              ]}
+            >
+              <Ionicons
+                name="options-outline"
+                size={16}
+                color={activeFilter ? '#fff' : accent}
+              />
+            </Pressable>
+          ) : (
+            <View style={styles.countPill}>
+              <Text style={styles.countNum}>
+                {brand ? listings.length : vitrin.length}
+              </Text>
+              <Text style={styles.countLabel}>ilan</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.heroWrap}>
+          <HeroBanner
+            source={MARKET_HERO}
+            eyebrow="Pazar"
+            title="2. El"
+            subtitle="Topluluktan güvenilir elektrikli araç ilanlarını keşfet."
+          />
+
+          <View style={styles.searchFloat}>
+            <Ionicons name="search" size={18} color={colors.textHint} />
+            <TextInput
+              ref={searchRef}
+              style={styles.searchInput}
+              placeholder="Model, şehir veya marka ara…"
+              placeholderTextColor={colors.textHint}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 ? (
+              <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                <Ionicons
+                  name="close-circle"
+                  size={18}
+                  color={colors.textHint}
+                />
               </Pressable>
             ) : null}
+            <Pressable
+              style={styles.filterBtnFloat}
+              onPress={() =>
+                brand ? setShowFilter(true) : setShowBrandPicker(true)
+              }
+              hitSlop={6}
+            >
+              <Ionicons
+                name="options-outline"
+                size={18}
+                color={colors.primary}
+              />
+            </Pressable>
           </View>
         </View>
 
-        <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
-          <SelectorButton
-            label="Marka"
-            value={brand?.name}
-            emoji={brand?.emoji}
-            color={accent}
-            onPress={() => setShowBrandPicker(true)}
-          />
+        <View style={styles.brandHeadingRow}>
+          <Text style={styles.brandHeading}>Markaya Göre</Text>
+          <Pressable onPress={() => setShowBrandPicker(true)}>
+            <Text style={styles.brandSeeAll}>Tümünü Gör ›</Text>
+          </Pressable>
         </View>
 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.brandsRow}
+        >
+          {featuredBrands.map((b) => {
+            const active = brand?.id === b.id;
+            return (
+              <Pressable
+                key={b.id}
+                onPress={() => {
+                  if (active) {
+                    setBrand(null);
+                    setModel('Tümü');
+                    setFilter(DEFAULT_FILTER);
+                  } else {
+                    selectBrand(b);
+                  }
+                }}
+                style={styles.brandItem}
+              >
+                <View
+                  style={[
+                    styles.brandCircle,
+                    {
+                      backgroundColor: active
+                        ? hexWithAlpha(b.color, 0.12)
+                        : colors.surface,
+                      borderColor: active
+                        ? hexWithAlpha(b.color, 0.55)
+                        : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={styles.brandEmoji}>{b.emoji}</Text>
+                </View>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.brandLabel,
+                    { color: active ? b.color : colors.textSecondary },
+                  ]}
+                >
+                  {b.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
         {brand ? (
-          <View style={{ paddingHorizontal: 20, marginTop: 10 }}>
+          <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
             <SelectorButton
               label="Model"
               value={model}
@@ -229,22 +372,41 @@ export function MarketplaceScreen() {
 
         {brand == null ? (
           <>
-            <View style={styles.vitrinHeader}>
-              <View style={styles.vitrinBar} />
-              <Text style={styles.vitrinTitle}>Vitrin</Text>
-              <Text style={styles.vitrinSub}>Öne Çıkan İlanlar</Text>
+            <View style={styles.feedHeader}>
+              <View>
+                <Text style={styles.feedTitle}>Vitrin</Text>
+                <Text style={styles.feedSub}>Öne çıkan ilanlar</Text>
+              </View>
+              <Pressable
+                style={styles.newListingBtn}
+                onPress={() => setShowNewListing(true)}
+              >
+                <Ionicons name="add" size={16} color="#fff" />
+                <Text style={styles.newListingLabel}>İlan Ver</Text>
+              </Pressable>
             </View>
-            <View style={styles.grid}>
-              {vitrin.map((l) => (
-                <GridCard
-                  key={l.id}
-                  listing={l}
-                  currentUserId={user?.uid}
-                  width={cardW}
-                  onPress={() => openDetail(l)}
+            {vitrin.length === 0 ? (
+              <View style={styles.empty}>
+                <Ionicons
+                  name="car-outline"
+                  size={48}
+                  color={colors.textHint}
                 />
-              ))}
-            </View>
+                <Text style={styles.emptyText}>Henüz vitrin ilanı yok</Text>
+              </View>
+            ) : (
+              <View style={styles.grid}>
+                {vitrin.map((l) => (
+                  <GridCard
+                    key={l.id}
+                    listing={l}
+                    currentUserId={user?.uid}
+                    width={cardW}
+                    onPress={() => openDetail(l)}
+                  />
+                ))}
+              </View>
+            )}
           </>
         ) : listings.length === 0 ? (
           <View style={styles.empty}>
@@ -261,16 +423,30 @@ export function MarketplaceScreen() {
           </View>
         ) : (
           <>
-            <View style={styles.countRow}>
-              <Text style={styles.countText}>{listings.length} ilan</Text>
-              {activeFilter ? (
+            <View style={styles.feedHeader}>
+              <View>
+                <Text style={styles.feedTitle}>{listings.length} ilan</Text>
+                <Text style={styles.feedSub}>
+                  {activeFilter ? 'Filtrelenmiş sonuçlar' : 'Tüm sonuçlar'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                {activeFilter ? (
+                  <Pressable
+                    onPress={() => setFilter(DEFAULT_FILTER)}
+                    style={styles.clearSmall}
+                  >
+                    <Text style={styles.clearSmallText}>Temizle</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable
-                  onPress={() => setFilter(DEFAULT_FILTER)}
-                  style={styles.clearSmall}
+                  style={styles.newListingBtn}
+                  onPress={() => setShowNewListing(true)}
                 >
-                  <Text style={styles.clearSmallText}>Temizle</Text>
+                  <Ionicons name="add" size={16} color="#fff" />
+                  <Text style={styles.newListingLabel}>İlan Ver</Text>
                 </Pressable>
-              ) : null}
+              </View>
             </View>
             <View style={styles.grid}>
               {listings.map((l) => (
@@ -300,9 +476,7 @@ export function MarketplaceScreen() {
         selected={brand}
         onClose={() => setShowBrandPicker(false)}
         onSelect={(b) => {
-          setBrand(b);
-          setModel('Tümü');
-          setFilter(DEFAULT_FILTER);
+          selectBrand(b);
           setShowBrandPicker(false);
         }}
       />
@@ -312,7 +486,7 @@ export function MarketplaceScreen() {
         title="Model Seç"
         options={brand ? ['Tümü', ...brand.models] : []}
         selected={model}
-        accent={brand?.color ?? EVColors.primary}
+        accent={brand?.color ?? colors.primary}
         onClose={() => setShowModelPicker(false)}
         onSelect={(m) => {
           setModel(m);
@@ -363,16 +537,17 @@ function SelectorButton({
   color: string;
   onPress: () => void;
 }) {
+  const { colors, styles } = useStyles();
   return (
     <Pressable
       onPress={onPress}
       style={[
         styles.selector,
         {
-          borderColor: value ? hexWithAlpha(color, 0.4) : EVColors.border,
+          borderColor: value ? hexWithAlpha(color, 0.4) : colors.border,
           backgroundColor: value
             ? hexWithAlpha(color, 0.06)
-            : EVColors.surface,
+            : colors.surface,
         },
       ]}
     >
@@ -389,7 +564,7 @@ function SelectorButton({
         <Text
           style={[
             styles.selectorValue,
-            { color: value ? color : EVColors.textHint },
+            { color: value ? color : colors.textHint },
           ]}
         >
           {value ?? 'Seçiniz'}
@@ -411,11 +586,12 @@ function GridCard({
   width: number;
   onPress: () => void;
 }) {
+  const { colors, styles } = useStyles();
   const [, tick] = useState(0);
   useEffect(() => subscribeFollow(() => tick((t) => t + 1)), []);
   const followed = isFollowing(listing.id);
   const damageColor =
-    listing.damageStatus === 'Kazasız' ? EVColors.primary : EVColors.error;
+    listing.damageStatus === 'Kazasız' ? colors.primary : colors.error;
 
   return (
     <Pressable onPress={onPress} style={[styles.card, { width }]}>
@@ -467,7 +643,7 @@ function GridCard({
             styles.followBtn,
             {
               backgroundColor: followed
-                ? EVColors.primary
+                ? colors.primary
                 : 'rgba(0,0,0,0.4)',
             },
           ]}
@@ -516,11 +692,11 @@ function GridCard({
         </Text>
         <Text style={styles.cardPrice}>{formatPrice(listing.price)}</Text>
         <View style={styles.cardMeta}>
-          <Ionicons name="speedometer-outline" size={11} color={EVColors.textHint} />
+          <Ionicons name="speedometer-outline" size={11} color={colors.textHint} />
           <Text style={styles.metaTxt}>
             {(listing.km / 1000).toFixed(0)}K
           </Text>
-          <Ionicons name="battery-charging" size={11} color={EVColors.textHint} />
+          <Ionicons name="battery-charging" size={11} color={colors.textHint} />
           <Text style={styles.metaTxt}>%{listing.batteryHealth}</Text>
           <Text style={[styles.metaTxt, { marginLeft: 'auto' }]}>
             {listing.location}
@@ -542,8 +718,14 @@ function BrandPickerModal({
   onClose: () => void;
   onSelect: (b: EvBrand) => void;
 }) {
+  const { colors, styles } = useStyles();
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.modalRoot}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.sheet}>
@@ -563,10 +745,10 @@ function BrandPickerModal({
                     {
                       backgroundColor: active
                         ? hexWithAlpha(item.color, 0.1)
-                        : EVColors.surface,
+                        : colors.surface,
                       borderColor: active
                         ? hexWithAlpha(item.color, 0.5)
-                        : EVColors.border,
+                        : colors.border,
                     },
                   ]}
                 >
@@ -582,7 +764,7 @@ function BrandPickerModal({
                     style={{
                       flex: 1,
                       fontWeight: '600',
-                      color: active ? item.color : EVColors.textPrimary,
+                      color: active ? item.color : colors.textPrimary,
                     }}
                   >
                     {item.name}
@@ -621,8 +803,14 @@ function PickerModal({
   onClose: () => void;
   onSelect: (v: string) => void;
 }) {
+  const { colors, styles } = useStyles();
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.modalRoot}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.sheet}>
@@ -639,10 +827,10 @@ function PickerModal({
                   {
                     backgroundColor: active
                       ? hexWithAlpha(accent, 0.1)
-                      : EVColors.surface,
+                      : colors.surface,
                     borderColor: active
                       ? hexWithAlpha(accent, 0.5)
-                      : EVColors.border,
+                      : colors.border,
                   },
                 ]}
               >
@@ -650,7 +838,7 @@ function PickerModal({
                   style={{
                     flex: 1,
                     fontWeight: '600',
-                    color: active ? accent : EVColors.textPrimary,
+                    color: active ? accent : colors.textPrimary,
                   }}
                 >
                   {o}
@@ -680,13 +868,19 @@ function FilterModal({
   onClose: () => void;
   onApply: (f: ListingFilter) => void;
 }) {
+  const { colors, styles } = useStyles();
   const [f, setF] = useState(current);
   useEffect(() => {
     if (visible) setF(current);
   }, [visible, current]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.modalRoot}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={[styles.sheet, { maxHeight: '85%' }]}>
@@ -694,7 +888,7 @@ function FilterModal({
           <View style={styles.filterHeader}>
             <Text style={styles.sheetTitle}>Filtrele</Text>
             <Pressable onPress={() => setF(DEFAULT_FILTER)}>
-              <Text style={{ color: EVColors.primary, fontWeight: '600' }}>
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>
                 Sıfırla
               </Text>
             </Pressable>
@@ -784,6 +978,7 @@ function ChipRow({
   onSelect: (o: string) => void;
   labels?: Record<string, string>;
 }) {
+  const { colors, styles } = useStyles();
   return (
     <View style={styles.chipRow}>
       {options.map((o) => {
@@ -795,8 +990,8 @@ function ChipRow({
             style={[
               styles.chip,
               {
-                backgroundColor: active ? accent : EVColors.surface,
-                borderColor: active ? accent : EVColors.border,
+                backgroundColor: active ? accent : colors.surface,
+                borderColor: active ? accent : colors.border,
               },
             ]}
           >
@@ -804,7 +999,7 @@ function ChipRow({
               style={{
                 fontSize: 12,
                 fontWeight: '600',
-                color: active ? '#fff' : EVColors.textSecondary,
+                color: active ? '#fff' : colors.textSecondary,
               }}
             >
               {labels?.[o] ?? o}
@@ -827,6 +1022,7 @@ function NewListingModal({
   onCreated: (listing: EvListing) => void;
   initialBrandId?: string;
 }) {
+  const { colors, styles } = useStyles();
   const { user } = useAuth();
   const [photos, setPhotos] = useState<string[]>([]);
   const [photoSizes, setPhotoSizes] = useState<number[]>([]);
@@ -1013,7 +1209,12 @@ function NewListingModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         style={styles.modalRoot}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1024,7 +1225,7 @@ function NewListingModal({
           <View style={styles.filterHeader}>
             <Text style={styles.sheetTitle}>İlan Ver</Text>
             <Pressable onPress={close} disabled={saving}>
-              <Ionicons name="close" size={22} color={EVColors.textSecondary} />
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
             </Pressable>
           </View>
           <ScrollView keyboardShouldPersistTaps="handled">
@@ -1042,15 +1243,15 @@ function NewListingModal({
                 disabled={picking || photos.length >= 8}
               >
                 {picking ? (
-                  <ActivityIndicator color={EVColors.primary} />
+                  <ActivityIndicator color={colors.primary} />
                 ) : (
                   <>
                     <Ionicons
                       name="camera-outline"
                       size={22}
-                      color={EVColors.primary}
+                      color={colors.primary}
                     />
-                    <Text style={{ color: EVColors.primary, fontWeight: '600' }}>
+                    <Text style={{ color: colors.primary, fontWeight: '600' }}>
                       Ekle ({photos.length}/8)
                     </Text>
                   </>
@@ -1095,8 +1296,8 @@ function NewListingModal({
                     style={[
                       styles.chip,
                       {
-                        backgroundColor: active ? b.color : EVColors.surface,
-                        borderColor: active ? b.color : EVColors.border,
+                        backgroundColor: active ? b.color : colors.surface,
+                        borderColor: active ? b.color : colors.border,
                       },
                     ]}
                   >
@@ -1104,7 +1305,7 @@ function NewListingModal({
                       style={{
                         fontSize: 12,
                         fontWeight: '600',
-                        color: active ? '#fff' : EVColors.textSecondary,
+                        color: active ? '#fff' : colors.textSecondary,
                       }}
                     >
                       {b.emoji} {b.name}
@@ -1136,10 +1337,10 @@ function NewListingModal({
                           {
                             backgroundColor: active
                               ? selectedBrand.color
-                              : EVColors.surface,
+                              : colors.surface,
                             borderColor: active
                               ? selectedBrand.color
-                              : EVColors.border,
+                              : colors.border,
                           },
                         ]}
                       >
@@ -1147,7 +1348,7 @@ function NewListingModal({
                           style={{
                             fontSize: 12,
                             fontWeight: '600',
-                            color: active ? '#fff' : EVColors.textSecondary,
+                            color: active ? '#fff' : colors.textSecondary,
                           }}
                         >
                           {m}
@@ -1175,11 +1376,11 @@ function NewListingModal({
                       styles.chip,
                       {
                         backgroundColor: active
-                          ? EVColors.primary
-                          : EVColors.surface,
+                          ? colors.primary
+                          : colors.surface,
                         borderColor: active
-                          ? EVColors.primary
-                          : EVColors.border,
+                          ? colors.primary
+                          : colors.border,
                       },
                     ]}
                   >
@@ -1187,7 +1388,7 @@ function NewListingModal({
                       style={{
                         fontSize: 12,
                         fontWeight: '600',
-                        color: active ? '#fff' : EVColors.textSecondary,
+                        color: active ? '#fff' : colors.textSecondary,
                       }}
                     >
                       {y}
@@ -1226,14 +1427,14 @@ function NewListingModal({
             <ChipRow
               options={['Sahibinden', 'Galeriden']}
               selected={sellerType}
-              accent={EVColors.primary}
+              accent={colors.primary}
               onSelect={setSellerType}
             />
             <Text style={styles.fLabel}>Hasar Durumu</Text>
             <ChipRow
               options={['Kazasız', 'Kazalı']}
               selected={damage}
-              accent={EVColors.primary}
+              accent={colors.primary}
               onSelect={setDamage}
             />
 
@@ -1243,14 +1444,14 @@ function NewListingModal({
             <ChipRow
               options={[...VEHICLE_COLORS]}
               selected={vehicleColor}
-              accent={EVColors.primary}
+              accent={colors.primary}
               onSelect={setVehicleColor}
             />
             <Text style={styles.fLabel}>Garanti</Text>
             <ChipRow
               options={[...WARRANTY_OPTIONS]}
               selected={warranty}
-              accent={EVColors.primary}
+              accent={colors.primary}
               onSelect={setWarranty}
             />
             <Field
@@ -1305,14 +1506,14 @@ function NewListingModal({
                 <ChipRow
                   options={[...DRIVETRAIN_OPTIONS]}
                   selected={drivetrain}
-                  accent={EVColors.primary}
+                  accent={colors.primary}
                   onSelect={setDrivetrain}
                 />
                 <Text style={styles.fLabel}>Şarj tipi</Text>
                 <ChipRow
                   options={['CCS2', 'CHAdeMO', 'Type2']}
                   selected={chargeType}
-                  accent={EVColors.primary}
+                  accent={colors.primary}
                   onSelect={setChargeType}
                 />
               </>
@@ -1352,6 +1553,7 @@ function Field({
   placeholder: string;
   keyboard?: 'numeric';
 }) {
+  const { colors, styles } = useStyles();
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={styles.fLabel}>{label}</Text>
@@ -1360,54 +1562,208 @@ function Field({
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
-        placeholderTextColor={EVColors.textHint}
+        placeholderTextColor={colors.textHint}
         keyboardType={keyboard === 'numeric' ? 'numeric' : 'default'}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: EVColors.background },
-  appBar: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  appBarActions: {
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.background },
+  scroll: { paddingTop: 4, paddingBottom: 24 },
+  topBar: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    marginRight: 12,
-    backgroundColor: EVColors.surface,
-    borderWidth: 1,
-    borderColor: EVColors.border,
+  brandBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  logoMark: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-  brandTitleSmall: {
-    fontSize: 20,
+  brandName: {
+    fontSize: 18,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
+    letterSpacing: -0.4,
+  },
+  brandNameSmall: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: c.textPrimary,
     letterSpacing: -0.3,
   },
-  subtitle: { fontSize: 13, color: EVColors.textSecondary, marginTop: 2 },
-  filterBtn: {
+  brandTagline: {
+    marginTop: 1,
+    fontSize: 11,
+    color: c.textSecondary,
+    fontWeight: '500',
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: c.primaryLight,
+    borderWidth: 1,
+    borderColor: c.primaryMid,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterPill: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countPill: {
+    minWidth: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 22,
+    backgroundColor: c.primary,
+    alignItems: 'center',
+  },
+  countNum: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#fff',
+    lineHeight: 16,
+  },
+  countLabel: {
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
+  },
+  heroWrap: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  searchFloat: {
+    marginTop: -24,
+    marginHorizontal: 10,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    gap: 8,
+    shadowColor: '#0D1B12',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: c.textPrimary,
+    paddingVertical: 0,
+  },
+  filterBtnFloat: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandHeadingRow: {
+    marginTop: 18,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  brandHeading: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: c.textPrimary,
+  },
+  brandSeeAll: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: c.primary,
+  },
+  brandsRow: {
+    paddingHorizontal: 16,
+    gap: 14,
+  },
+  brandItem: {
+    width: 64,
+    alignItems: 'center',
+    gap: 6,
+  },
+  brandCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandEmoji: { fontSize: 24 },
+  brandLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  feedHeader: {
+    marginTop: 20,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  feedTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: c.textPrimary,
+    letterSpacing: -0.3,
+  },
+  feedSub: {
+    marginTop: 2,
+    fontSize: 12,
+    color: c.textHint,
+    fontWeight: '500',
+  },
+  newListingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: c.primary,
+  },
+  newListingLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   selector: {
     flexDirection: 'row',
@@ -1427,41 +1783,21 @@ const styles = StyleSheet.create({
   },
   selectorLabel: {
     fontSize: 11,
-    color: EVColors.textHint,
+    color: c.textHint,
     fontWeight: '500',
   },
   selectorValue: { fontSize: 15, fontWeight: '700', marginTop: 1 },
-  vitrinHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginTop: 20,
-    marginBottom: 12,
-    gap: 10,
-  },
-  vitrinBar: {
-    width: 4,
-    height: 20,
-    borderRadius: 2,
-    backgroundColor: EVColors.primary,
-  },
-  vitrinTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: EVColors.textPrimary,
-  },
-  vitrinSub: { fontSize: 13, color: EVColors.textSecondary },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     gap: 12,
   },
   card: {
     borderRadius: 16,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     overflow: 'hidden',
     marginBottom: 4,
   },
@@ -1508,13 +1844,13 @@ const styles = StyleSheet.create({
   cardModel: {
     fontSize: 11,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   cardPrice: {
     marginTop: 4,
     fontSize: 13,
     fontWeight: '800',
-    color: EVColors.primary,
+    color: c.primary,
   },
   cardMeta: {
     marginTop: 5,
@@ -1522,21 +1858,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
-  metaTxt: { fontSize: 10, color: EVColors.textSecondary, marginRight: 4 },
+  metaTxt: { fontSize: 10, color: c.textSecondary, marginRight: 4 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyText: {
     fontSize: 15,
     fontWeight: '600',
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
   },
   clearPill: {
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
   },
   clearPillText: {
-    color: EVColors.primary,
+    color: c.primary,
     fontWeight: '600',
     fontSize: 13,
   },
@@ -1551,7 +1887,7 @@ const styles = StyleSheet.create({
   countText: {
     fontSize: 13,
     fontWeight: '600',
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
   },
   clearSmall: {
     backgroundColor: '#FFE5E5',
@@ -1562,7 +1898,7 @@ const styles = StyleSheet.create({
   clearSmallText: {
     fontSize: 11,
     fontWeight: '600',
-    color: EVColors.error,
+    color: c.error,
   },
   fab: {
     position: 'absolute',
@@ -1571,11 +1907,11 @@ const styles = StyleSheet.create({
     height: 50,
     paddingHorizontal: 18,
     borderRadius: 16,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    shadowColor: EVColors.primary,
+    shadowColor: c.primary,
     shadowOpacity: 0.35,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
@@ -1584,11 +1920,15 @@ const styles = StyleSheet.create({
   fabLabel: { color: '#fff', fontWeight: '700', fontSize: 14 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   sheet: {
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -1599,14 +1939,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: EVColors.border,
+    backgroundColor: c.border,
     marginTop: 10,
     marginBottom: 12,
   },
   sheetTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     marginBottom: 12,
   },
   pickItem: {
@@ -1633,14 +1973,14 @@ const styles = StyleSheet.create({
   fLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     marginTop: 8,
     marginBottom: 8,
   },
   sectionHint: {
     fontSize: 12,
     fontWeight: '600',
-    color: EVColors.primary,
+    color: c.primary,
     marginBottom: 4,
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
@@ -1654,7 +1994,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     height: 50,
     borderRadius: 16,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1664,9 +2004,9 @@ const styles = StyleSheet.create({
     height: 110,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: EVColors.primary,
+    borderColor: c.primary,
     borderStyle: 'dashed',
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
@@ -1677,7 +2017,7 @@ const styles = StyleSheet.create({
     height: 110,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: EVColors.border,
+    backgroundColor: c.border,
   },
   photoThumb: { width: '100%', height: '100%' },
   photoRemove: {
@@ -1707,17 +2047,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 20,
     fontSize: 12,
-    color: EVColors.textHint,
+    color: c.textHint,
     textAlign: 'center',
   },
   field: {
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
 });
+}

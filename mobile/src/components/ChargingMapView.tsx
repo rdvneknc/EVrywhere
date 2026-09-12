@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { ChargingStation, stationMarkerColor } from '../data/charging';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 type Props = {
   stations: ChargingStation[];
@@ -18,6 +19,8 @@ export function ChargingMapView({
   centerLng,
   onStationTap,
 }: Props) {
+  const { colors, resolved } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, resolved), [colors, resolved]);
   const mapRef = useRef<MapView>(null);
   const ready = centerLat != null || stations.length > 0;
 
@@ -85,6 +88,7 @@ export function ChargingMapView({
           provider={PROVIDER_DEFAULT}
           initialRegion={initial}
           rotateEnabled={false}
+          userInterfaceStyle={resolved}
         >
           {centerLat != null && centerLng != null ? (
             <Marker
@@ -126,76 +130,80 @@ export function ChargingMapView({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    marginHorizontal: 20,
-    marginTop: 16,
-    height: 220,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: EVColors.border,
-    overflow: 'hidden',
-    backgroundColor: '#EDF7F0',
-  },
-  placeholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: EVColors.textSecondary,
-  },
-  userDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: EVColors.acBlue,
-    borderWidth: 3,
-    borderColor: '#fff',
-  },
-  markerCol: { alignItems: 'center' },
-  marker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2.5,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tail: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 6,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-  },
-  osmBadge: {
-    position: 'absolute',
-    left: 10,
-    bottom: 8,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  osmText: { fontSize: 9, color: EVColors.textSecondary },
-  countBadge: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  countText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: EVColors.textPrimary,
-  },
-});
+function makeStyles(c: EVColorPalette, resolved: 'light' | 'dark') {
+  const badgeBg =
+    resolved === 'dark' ? 'rgba(18,32,24,0.92)' : 'rgba(255,255,255,0.92)';
+  return StyleSheet.create({
+    wrap: {
+      marginHorizontal: 16,
+      marginTop: 14,
+      height: 240,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: c.border,
+      overflow: 'hidden',
+      backgroundColor: c.primaryLight,
+    },
+    placeholder: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    placeholderText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: c.textSecondary,
+    },
+    userDot: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: c.acBlue,
+      borderWidth: 3,
+      borderColor: '#fff',
+    },
+    markerCol: { alignItems: 'center' },
+    marker: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      borderWidth: 2.5,
+      borderColor: '#fff',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tail: {
+      width: 0,
+      height: 0,
+      borderLeftWidth: 5,
+      borderRightWidth: 5,
+      borderTopWidth: 6,
+      borderLeftColor: 'transparent',
+      borderRightColor: 'transparent',
+    },
+    osmBadge: {
+      position: 'absolute',
+      left: 10,
+      bottom: 8,
+      backgroundColor: badgeBg,
+      borderRadius: 8,
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+    },
+    osmText: { fontSize: 9, color: c.textSecondary },
+    countBadge: {
+      position: 'absolute',
+      right: 10,
+      top: 10,
+      backgroundColor: badgeBg,
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    countText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: c.textPrimary,
+    },
+  });
+}

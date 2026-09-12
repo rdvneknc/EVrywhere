@@ -16,21 +16,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { HeaderMessagesButton } from '../components/HeaderMessagesButton';
-import { EVColors } from '../theme/colors';
-import {
-  ChargingStation,
-  connectorColor,
-} from '../data/charging';
-import {
-  getChargingStations,
-  geocodeCity,
-} from '../api/chargingStations';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import { ChargingStation, connectorColor } from '../data/charging';
+import { getChargingStations, geocodeCity } from '../api/chargingStations';
 import { ChargingMapView } from '../components/ChargingMapView';
 import { hexWithAlpha } from '../data/forum';
-import {
-  TurkeyPlace,
-  searchTurkeyPlaces,
-} from '../data/turkeyPlaces';
+import { TurkeyPlace, searchTurkeyPlaces } from '../data/turkeyPlaces';
 import { useAuth } from '../auth/AuthContext';
 import {
   StationReview,
@@ -40,11 +32,24 @@ import {
   upsertStationReview,
 } from '../api/chargingReviews';
 import { promptReport } from '../lib/reportPrompt';
+import { HeroBanner } from '../components/HeroBanner';
 
-const FILTERS = ['All', 'AC', 'DC', 'HPC'] as const;
+const CHARGING_HERO = require('../../assets/forum-hero.jpg');
+
+const FILTERS = [
+  { id: 'All', label: 'Tümü', emoji: '⚡' },
+  { id: 'AC', label: 'AC', emoji: '🔌' },
+  { id: 'DC', label: 'DC', emoji: '🔋' },
+  { id: 'HPC', label: 'HPC', emoji: '🚀' },
+] as const;
+
+type FilterId = (typeof FILTERS)[number]['id'];
+
 const RADIUS_OPTIONS = [5, 10, 15, 25, 50, 100];
 
 export function ChargingScreen() {
+  const { colors, styles } = useStyles();
+  const searchRef = useRef<TextInput>(null);
   const [city, setCity] = useState('');
   const [citySuggestions, setCitySuggestions] = useState<TurkeyPlace[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -56,7 +61,7 @@ export function ChargingScreen() {
   const [refLng, setRefLng] = useState<number | null>(null);
   const [locationLabel, setLocationLabel] = useState('…');
   const [distanceKm, setDistanceKm] = useState(25);
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
+  const [filter, setFilter] = useState<FilterId>('All');
   const [selected, setSelected] = useState<ChargingStation | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const distanceRef = useRef(distanceKm);
@@ -146,7 +151,6 @@ export function ChargingScreen() {
     try {
       const matches = searchTurkeyPlaces(q, 1);
       const local = matches[0];
-      // Tam / güçlü eşleşme varsa yerel koordinat kullan
       if (local) {
         setRefLat(local.lat);
         setRefLng(local.lng);
@@ -224,125 +228,177 @@ export function ChargingScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => void onRefresh()}
-            tintColor={EVColors.primary}
-            colors={[EVColors.primary]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
-        <View style={styles.appBar}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>Şarj İstasyonları</Text>
-            <View style={styles.titleActions}>
-              <HeaderMessagesButton compact />
-              <Pressable onPress={bootstrapLocation} hitSlop={8}>
-                <Ionicons name="locate" size={22} color={EVColors.primary} />
-              </Pressable>
+        <View style={styles.topBar}>
+          <View style={styles.brandBlock}>
+            <View style={styles.logoMark}>
+              <Ionicons name="flash" size={16} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.brandTitle}>
+                <Text style={{ color: colors.primary }}>EV</Text>rywhere
+              </Text>
+              <Text style={styles.brandTagline}>Daha temiz yarınlar için</Text>
             </View>
           </View>
-          <Text style={styles.source}>Kaynak: Open Charge Map</Text>
-          <View style={styles.searchWrap}>
-            <View style={styles.searchRow}>
-              <View style={styles.cityInputWrap}>
-                <TextInput
-                  style={styles.cityInput}
-                  value={city}
-                  onChangeText={onCityChange}
-                  placeholder="Şehir veya ilçe (ör. An… → Ankara)"
-                  placeholderTextColor={EVColors.textHint}
-                  returnKeyType="search"
-                  onSubmitEditing={() => void onCitySearch()}
-                  onFocus={() => {
-                    if (city.trim().length >= 1) {
-                      const next = searchTurkeyPlaces(city, 10);
-                      setCitySuggestions(next);
-                      setShowSuggestions(next.length > 0);
-                    }
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => setShowSuggestions(false), 200);
-                  }}
-                />
-                {city.length > 0 ? (
-                  <Pressable
-                    style={styles.clearBtn}
-                    onPress={clearCity}
-                    hitSlop={10}
-                    accessibilityLabel="Temizle"
-                  >
-                    <Ionicons
-                      name="close-circle"
-                      size={20}
-                      color={EVColors.textHint}
-                    />
-                  </Pressable>
-                ) : null}
-              </View>
-              <Pressable
-                style={styles.searchBtn}
-                onPress={() => void onCitySearch()}
-              >
-                <Text style={styles.searchBtnText}>Ara</Text>
-              </Pressable>
-            </View>
-            {showSuggestions ? (
-              <View style={styles.suggestBox}>
-                {citySuggestions.map((p) => (
-                  <Pressable
-                    key={`${p.label}-${p.lat}`}
-                    style={styles.suggestItem}
-                    onPress={() => void selectPlace(p)}
-                  >
-                    <Ionicons
-                      name="location-outline"
-                      size={16}
-                      color={EVColors.primary}
-                    />
-                    <Text style={styles.suggestText}>{p.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-          </View>
-          <Text style={styles.centerLabel} numberOfLines={2}>
-            Merkez: {locationLabel}
-          </Text>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => searchRef.current?.focus()}
+            hitSlop={6}
+          >
+            <Ionicons name="search" size={18} color={colors.primary} />
+          </Pressable>
+          <HeaderMessagesButton compact />
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => void bootstrapLocation()}
+            hitSlop={6}
+            accessibilityLabel="Konumumu kullan"
+          >
+            <Ionicons name="locate" size={18} color={colors.primary} />
+          </Pressable>
         </View>
 
-        <View style={styles.radiusBlock}>
-          <Text style={styles.radiusLabel}>Yarıçap: {distanceKm} km</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8 }}
-          >
-            {RADIUS_OPTIONS.map((km) => {
-              const active = distanceKm === km;
-              return (
+        <View style={styles.heroWrap}>
+          <HeroBanner
+            source={CHARGING_HERO}
+            eyebrow="Harita"
+            title="Şarj"
+            subtitle="Yakındaki istasyonları bul, filtrele ve deneyimlerini paylaş."
+          />
+
+          <View style={styles.searchFloat}>
+            <Ionicons name="search" size={18} color={colors.textHint} />
+            <TextInput
+              ref={searchRef}
+              style={styles.searchInput}
+              value={city}
+              onChangeText={onCityChange}
+              placeholder="Şehir veya ilçe ara…"
+              placeholderTextColor={colors.textHint}
+              returnKeyType="search"
+              onSubmitEditing={() => void onCitySearch()}
+              onFocus={() => {
+                if (city.trim().length >= 1) {
+                  const next = searchTurkeyPlaces(city, 10);
+                  setCitySuggestions(next);
+                  setShowSuggestions(next.length > 0);
+                }
+              }}
+              onBlur={() => {
+                setTimeout(() => setShowSuggestions(false), 200);
+              }}
+            />
+            {city.length > 0 ? (
+              <Pressable onPress={clearCity} hitSlop={8}>
+                <Ionicons
+                  name="close-circle"
+                  size={18}
+                  color={colors.textHint}
+                />
+              </Pressable>
+            ) : null}
+            <Pressable
+              style={styles.searchGo}
+              onPress={() => void onCitySearch()}
+            >
+              <Text style={styles.searchGoLabel}>Ara</Text>
+            </Pressable>
+          </View>
+
+          {showSuggestions ? (
+            <View style={styles.suggestBox}>
+              {citySuggestions.map((p) => (
                 <Pressable
-                  key={km}
-                  onPress={() => scheduleReload(km)}
+                  key={`${p.label}-${p.lat}`}
+                  style={styles.suggestItem}
+                  onPress={() => void selectPlace(p)}
+                >
+                  <Ionicons
+                    name="location-outline"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.suggestText}>{p.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+        </View>
+
+        <Text style={styles.centerLabel} numberOfLines={2}>
+          Merkez: {locationLabel}
+          <Text style={styles.sourceHint}> · Open Charge Map</Text>
+        </Text>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+        >
+          {FILTERS.map((f) => {
+            const active = f.id === filter;
+            return (
+              <Pressable
+                key={f.id}
+                onPress={() => setFilter(f.id)}
+                style={[styles.chip, active && styles.chipActive]}
+              >
+                <Text style={styles.chipEmoji}>{f.emoji}</Text>
+                <Text
                   style={[
-                    styles.radiusChip,
-                    active && styles.radiusChipActive,
+                    styles.chipLabel,
+                    {
+                      color: active
+                        ? colors.onPrimary
+                        : colors.textSecondary,
+                    },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.radiusChipText,
-                      {
-                        color: active
-                          ? EVColors.onPrimary
-                          : EVColors.textSecondary,
-                      },
-                    ]}
-                  >
-                    {km} km
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+                  {f.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.sectionHeadingRow}>
+          <Text style={styles.sectionHeading}>Yarıçap</Text>
+          <Text style={styles.sectionHint}>{distanceKm} km</Text>
         </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.radiusRow}
+        >
+          {RADIUS_OPTIONS.map((km) => {
+            const active = distanceKm === km;
+            return (
+              <Pressable
+                key={km}
+                onPress={() => scheduleReload(km)}
+                style={[styles.radiusChip, active && styles.radiusChipActive]}
+              >
+                <Text
+                  style={[
+                    styles.radiusChipText,
+                    {
+                      color: active
+                        ? colors.onPrimary
+                        : colors.textSecondary,
+                    },
+                  ]}
+                >
+                  {km} km
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
         <ChargingMapView
           stations={filtered}
@@ -356,11 +412,11 @@ export function ChargingScreen() {
             <StatPill
               icon="flash"
               label={`${stations.length} nokta`}
-              bg={EVColors.primaryLight}
-              fg={EVColors.primary}
+              bg={colors.primaryLight}
+              fg={colors.primary}
             />
             <StatPill
-              icon="flash"
+              icon="speedometer-outline"
               label={`Max ${maxPower} kW`}
               bg="#FFF3E0"
               fg="#BF6D00"
@@ -376,53 +432,40 @@ export function ChargingScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filters}
-        >
-          {FILTERS.map((f) => {
-            const active = f === filter;
-            return (
-              <Pressable
-                key={f}
-                onPress={() => setFilter(f)}
-                style={[styles.filterChip, active && styles.filterChipActive]}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '600',
-                    color: active
-                      ? EVColors.onPrimary
-                      : EVColors.textSecondary,
-                  }}
-                >
-                  {f}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {loading ? '…' : filtered.length} İstasyon
-          </Text>
-          <Text style={styles.sectionSort}>Uzaklığa göre</Text>
+        <View style={styles.feedHeader}>
+          <View>
+            <Text style={styles.feedTitle}>
+              {loading ? '…' : `${filtered.length} İstasyon`}
+            </Text>
+            <Text style={styles.feedSub}>Uzaklığa göre sıralı</Text>
+          </View>
+          <Pressable
+            style={styles.locateBtn}
+            onPress={() => void bootstrapLocation()}
+          >
+            <Ionicons name="navigate" size={14} color="#fff" />
+            <Text style={styles.locateLabel}>Konumum</Text>
+          </Pressable>
         </View>
 
         {loading && stations.length === 0 ? (
-          <ActivityIndicator
-            color={EVColors.primary}
-            style={{ marginVertical: 40 }}
-          />
+          <View style={styles.empty}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.emptyText}>İstasyonlar yükleniyor…</Text>
+          </View>
         ) : !loading && filtered.length === 0 ? (
-          <Text style={styles.empty}>
-            {refLat == null
-              ? 'Konum yok. Şehir arayın veya izin verin.'
-              : 'Bu filtrede / yarıçapta sonuç yok.'}
-          </Text>
+          <View style={styles.empty}>
+            <Ionicons
+              name="flash-outline"
+              size={48}
+              color={colors.textHint}
+            />
+            <Text style={styles.emptyText}>
+              {refLat == null
+                ? 'Konum yok. Şehir arayın veya izin verin.'
+                : 'Bu filtrede / yarıçapta sonuç yok.'}
+            </Text>
+          </View>
         ) : (
           filtered.map((s) => (
             <StationCard
@@ -433,7 +476,7 @@ export function ChargingScreen() {
           ))
         )}
 
-        <View style={{ height: 32 }} />
+        <View style={{ height: 28 }} />
       </ScrollView>
 
       <StationDetailModal
@@ -455,6 +498,7 @@ function StatPill({
   bg: string;
   fg: string;
 }) {
+  const { colors, styles } = useStyles();
   return (
     <View
       style={[
@@ -475,55 +519,49 @@ function StationCard({
   station: ChargingStation;
   onPress: () => void;
 }) {
+  const { colors, styles } = useStyles();
   return (
     <Pressable onPress={onPress} style={styles.card}>
-      <View style={styles.cardTop}>
+      <View style={styles.cardIconWrap}>
         <View style={styles.cardIcon}>
-          <Ionicons name="flash" size={24} color={EVColors.primary} />
+          <Ionicons name="flash" size={20} color={colors.primary} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardName}>{station.name}</Text>
-          <Text style={styles.cardAddress} numberOfLines={2}>
-            {station.address}
-          </Text>
-        </View>
-        <Text style={styles.cardDist}>{station.distanceKm} km</Text>
       </View>
-      <View style={styles.divider} />
-      <View style={styles.cardBottom}>
-        {station.connectorLabels.map((c) => {
-          const color = connectorColor(c);
-          return (
-            <View
-              key={c}
-              style={[
-                styles.connChip,
-                {
-                  backgroundColor: hexWithAlpha(color, 0.12),
-                  borderColor: hexWithAlpha(color, 0.3),
-                },
-              ]}
-            >
-              <Text style={{ fontSize: 10, fontWeight: '700', color }}>{c}</Text>
-            </View>
-          );
-        })}
-        <View
-          style={[
-            styles.powerChip,
-            { backgroundColor: hexWithAlpha(EVColors.dcAmber, 0.1) },
-          ]}
-        >
-          <Ionicons name="flash" size={11} color={EVColors.dcAmber} />
-          <Text
-            style={{
-              fontSize: 10,
-              fontWeight: '600',
-              color: EVColors.dcAmber,
-            }}
-          >
+
+      <View style={styles.cardBody}>
+        <View style={styles.cardTopRow}>
+          {station.connectorLabels.slice(0, 3).map((c) => {
+            const color = connectorColor(c);
+            return (
+              <View
+                key={c}
+                style={[styles.badge, { backgroundColor: hexWithAlpha(color, 0.12) }]}
+              >
+                <Text style={[styles.badgeText, { color }]}>{c}</Text>
+              </View>
+            );
+          })}
+          <Text style={styles.cardDist}>{station.distanceKm} km</Text>
+        </View>
+
+        <Text numberOfLines={2} style={styles.cardTitle}>
+          {station.name}
+        </Text>
+        <Text style={styles.cardMetaLine} numberOfLines={2}>
+          {station.address || 'Adres yok'}
+        </Text>
+
+        <View style={styles.cardStats}>
+          <Ionicons name="flash-outline" size={13} color={colors.dcAmber} />
+          <Text style={[styles.stat, { color: colors.dcAmber }]}>
             {station.maxPowerKw} kW
           </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color={colors.textHint}
+            style={{ marginLeft: 'auto' }}
+          />
         </View>
       </View>
     </Pressable>
@@ -537,6 +575,7 @@ function StationDetailModal({
   station: ChargingStation | null;
   onClose: () => void;
 }) {
+  const { colors, styles } = useStyles();
   const { user } = useAuth();
   const [reviews, setReviews] = useState<StationReview[]>([]);
   const [loading, setLoading] = useState(false);
@@ -609,19 +648,49 @@ function StationDetailModal({
   };
 
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={station != null}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.modalRoot}>
-        <Pressable style={styles.modalBackdrop} onPress={onClose} />
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={onClose}
+          accessibilityLabel="Kapat"
+        />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
           style={styles.sheet}
         >
-          <View style={styles.handle} />
-          <ScrollView keyboardShouldPersistTaps="handled">
-            <Text style={styles.sheetTitle}>{station.name}</Text>
-            <Text style={styles.sheetAddress}>{station.address}</Text>
+          <View style={styles.sheetHeader}>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              style={styles.sheetHandleHit}
+              accessibilityLabel="Aşağı kaydırarak kapat"
+            >
+              <View style={styles.handle} />
+            </Pressable>
+            <Pressable
+              onPress={onClose}
+              style={styles.sheetCloseBtn}
+              hitSlop={8}
+              accessibilityLabel="Kapat"
+            >
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: 16 }}
+          >
+            <Text style={styles.sheetTitle}>{station!.name}</Text>
+            <Text style={styles.sheetAddress}>{station!.address}</Text>
             <Text style={styles.sheetMeta}>
-              OCM #{station.ocmId} · {station.distanceKm} km
+              OCM #{station!.ocmId} · {station!.distanceKm} km
               {avg != null ? ` · ★ ${avg} (${reviews.length})` : ''}
             </Text>
 
@@ -630,22 +699,25 @@ function StationDetailModal({
                 style={styles.outlineBtn}
                 onPress={() => {
                   setStars(myReview?.rating || 4);
+                  setShowComment(false);
                   setShowRate(true);
                 }}
               >
                 <Ionicons
                   name={myReview ? 'star' : 'star-outline'}
                   size={18}
-                  color={EVColors.textPrimary}
+                  color={colors.textPrimary}
                 />
                 <Text style={styles.outlineBtnText}>
                   {myReview ? 'Puanını güncelle' : 'Puan ver'}
                 </Text>
               </Pressable>
               <Pressable
-                style={styles.filledBtn}
+                style={styles.actionBtn}
                 onPress={() => {
                   setCommentText(myReview?.text || '');
+                  setStars(myReview?.rating || stars || 4);
+                  setShowRate(false);
                   setShowComment(true);
                 }}
               >
@@ -659,7 +731,7 @@ function StationDetailModal({
               İncelemeler ({reviews.length})
             </Text>
             {loading ? (
-              <ActivityIndicator color={EVColors.primary} />
+              <ActivityIndicator color={colors.primary} />
             ) : reviews.length === 0 ? (
               <Text style={styles.noComments}>
                 Henüz inceleme yok. İlk puanı sen ver.
@@ -722,7 +794,7 @@ function StationDetailModal({
                       <Ionicons
                         name="trash-outline"
                         size={16}
-                        color={EVColors.textHint}
+                        color={colors.textHint}
                       />
                     </Pressable>
                   ) : user ? (
@@ -730,7 +802,7 @@ function StationDetailModal({
                       <Ionicons
                         name="flag-outline"
                         size={16}
-                        color={EVColors.textHint}
+                        color={colors.textHint}
                       />
                     </Pressable>
                   ) : null}
@@ -739,56 +811,92 @@ function StationDetailModal({
             )}
           </ScrollView>
 
-          {showRate ? (
-            <View style={styles.innerModal}>
-              <Text style={styles.innerTitle}>Puan ver</Text>
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Pressable key={i} onPress={() => setStars(i)}>
+          {showRate || showComment ? (
+            <View style={styles.composerWrap}>
+              <View style={styles.composerCard}>
+                <View style={styles.composerHeader}>
+                  <Text style={styles.innerTitle}>
+                    {showComment ? 'Yorum yaz' : 'Puan ver'}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setShowRate(false);
+                      setShowComment(false);
+                    }}
+                    hitSlop={8}
+                    accessibilityLabel="İptal"
+                  >
                     <Ionicons
-                      name="star"
-                      size={32}
-                      color={i <= stars ? '#FFB800' : EVColors.divider}
+                      name="close"
+                      size={20}
+                      color={colors.textSecondary}
                     />
                   </Pressable>
-                ))}
-              </View>
-              <View style={styles.innerActions}>
-                <Pressable onPress={() => setShowRate(false)}>
-                  <Text style={styles.cancelText}>İptal</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.filledBtn, saving && { opacity: 0.7 }]}
-                  disabled={saving}
-                  onPress={() => void submitReview(stars)}
-                >
-                  <Text style={styles.filledBtnText}>Gönder</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
+                </View>
 
-          {showComment ? (
-            <View style={styles.innerModal}>
-              <Text style={styles.innerTitle}>Yorum</Text>
-              <TextInput
-                style={styles.commentInput}
-                value={commentText}
-                onChangeText={setCommentText}
-                placeholder="İstasyon hakkında deneyimini yaz…"
-                placeholderTextColor={EVColors.textHint}
-                multiline
-              />
-              <Pressable
-                style={[styles.filledBtn, saving && { opacity: 0.7 }]}
-                disabled={saving}
-                onPress={() => {
-                  if (!commentText.trim()) return;
-                  void submitReview(myReview?.rating || stars, commentText);
-                }}
-              >
-                <Text style={styles.filledBtnText}>Kaydet</Text>
-              </Pressable>
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Pressable key={i} onPress={() => setStars(i)} hitSlop={4}>
+                      <Ionicons
+                        name="star"
+                        size={32}
+                        color={i <= stars ? '#FFB800' : colors.divider}
+                      />
+                    </Pressable>
+                  ))}
+                </View>
+
+                {showComment ? (
+                  <TextInput
+                    style={styles.commentInput}
+                    value={commentText}
+                    onChangeText={setCommentText}
+                    placeholder="İstasyon hakkında deneyimini yaz…"
+                    placeholderTextColor={colors.textHint}
+                    multiline
+                    autoFocus
+                    textAlignVertical="top"
+                  />
+                ) : null}
+
+                <View style={styles.innerActions}>
+                  <Pressable
+                    onPress={() => {
+                      setShowRate(false);
+                      setShowComment(false);
+                    }}
+                    style={styles.cancelBtn}
+                  >
+                    <Text style={styles.cancelText}>İptal</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.actionBtn,
+                      { flex: 0, minWidth: 120 },
+                      saving && { opacity: 0.7 },
+                    ]}
+                    disabled={saving}
+                    onPress={() => {
+                      if (showComment && !commentText.trim()) {
+                        Alert.alert('Yorum boş', 'Birkaç cümle yazıp kaydet.');
+                        return;
+                      }
+                      void submitReview(
+                        stars,
+                        showComment ? commentText : undefined,
+                      );
+                    }}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.filledBtnText}>
+                        {showComment ? 'Kaydet' : 'Gönder'}
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
             </View>
           ) : null}
         </KeyboardAvoidingView>
@@ -797,75 +905,109 @@ function StationDetailModal({
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: EVColors.background },
-  scroll: { paddingBottom: 24 },
-  appBar: { paddingHorizontal: 20, paddingTop: 4 },
-  titleRow: {
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.background },
+  scroll: { paddingTop: 4, paddingBottom: 24 },
+  topBar: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
   },
-  titleActions: {
+  brandBlock: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    minWidth: 0,
   },
-  title: {
-    fontSize: 24,
+  logoMark: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandTitle: {
+    fontSize: 18,
     fontWeight: '800',
-    color: EVColors.textPrimary,
-    letterSpacing: -0.5,
+    color: c.textPrimary,
+    letterSpacing: -0.4,
   },
-  source: {
-    marginTop: 4,
+  brandTagline: {
+    marginTop: 1,
     fontSize: 11,
-    color: EVColors.textHint,
+    color: c.textSecondary,
+    fontWeight: '500',
   },
-  searchWrap: {
-    marginTop: 12,
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: c.primaryLight,
+    borderWidth: 1,
+    borderColor: c.primaryMid,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroWrap: {
+    marginHorizontal: 16,
+    marginBottom: 8,
     zIndex: 20,
   },
-  searchRow: {
+  searchFloat: {
+    marginTop: -24,
+    marginHorizontal: 10,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     flexDirection: 'row',
-    gap: 8,
-  },
-  cityInputWrap: {
-    flex: 1,
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  cityInput: {
-    backgroundColor: EVColors.surface,
-    borderWidth: 1,
-    borderColor: EVColors.border,
-    borderRadius: 14,
+    alignItems: 'center',
     paddingHorizontal: 14,
-    paddingRight: 40,
-    paddingVertical: 12,
-    fontSize: 13,
-    color: EVColors.textPrimary,
+    gap: 8,
+    shadowColor: '#0D1B12',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  clearBtn: {
-    position: 'absolute',
-    right: 10,
-    top: 0,
-    bottom: 0,
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: c.textPrimary,
+    paddingVertical: 0,
+  },
+  searchGo: {
+    paddingHorizontal: 12,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: c.primary,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  searchBtn: {
-    backgroundColor: EVColors.primary,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
+  searchGoLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
-  searchBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   suggestBox: {
-    marginTop: 6,
-    backgroundColor: EVColors.surface,
-    borderRadius: 14,
+    marginTop: 8,
+    marginHorizontal: 10,
+    backgroundColor: c.surface,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     overflow: 'hidden',
   },
   suggestItem: {
@@ -875,46 +1017,89 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: EVColors.divider,
+    borderBottomColor: c.divider,
   },
   suggestText: {
     flex: 1,
     fontSize: 14,
     fontWeight: '600',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   centerLabel: {
-    marginTop: 6,
+    marginHorizontal: 20,
+    marginTop: 4,
     fontSize: 12,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '500',
   },
-  radiusBlock: { paddingHorizontal: 20, paddingTop: 12 },
-  radiusLabel: {
-    fontSize: 13,
+  sourceHint: {
+    color: c.textHint,
+    fontWeight: '400',
+  },
+  chipsRow: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    gap: 8,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 22,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.border,
+    gap: 5,
+  },
+  chipActive: {
+    backgroundColor: c.primary,
+    borderColor: c.primary,
+  },
+  chipEmoji: { fontSize: 12 },
+  chipLabel: { fontSize: 12, fontWeight: '600' },
+  sectionHeadingRow: {
+    marginTop: 18,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionHeading: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: c.textPrimary,
+  },
+  sectionHint: {
+    fontSize: 12,
     fontWeight: '600',
-    color: EVColors.textPrimary,
-    marginBottom: 8,
+    color: c.primary,
+  },
+  radiusRow: {
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: 4,
   },
   radiusChip: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   radiusChipActive: {
-    backgroundColor: EVColors.primary,
-    borderColor: EVColors.primary,
+    backgroundColor: c.primary,
+    borderColor: c.primary,
   },
   radiusChipText: { fontSize: 12, fontWeight: '600' },
   statsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
   },
   statPill: {
     flexDirection: 'row',
@@ -926,152 +1111,188 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   error: {
-    marginHorizontal: 20,
-    marginTop: 8,
+    marginHorizontal: 16,
+    marginTop: 10,
     fontSize: 12,
     color: '#C0392B',
     lineHeight: 16,
   },
-  filters: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: EVColors.surface,
-    borderWidth: 1,
-    borderColor: EVColors.border,
-  },
-  filterChipActive: {
-    backgroundColor: EVColors.primary,
-    borderColor: EVColors.primary,
-  },
-  sectionHeader: {
+  feedHeader: {
     marginTop: 20,
-    marginHorizontal: 20,
-    marginBottom: 10,
+    marginHorizontal: 16,
+    marginBottom: 8,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
   },
-  sectionTitle: {
+  feedTitle: {
     fontSize: 17,
-    fontWeight: '700',
-    color: EVColors.textPrimary,
+    fontWeight: '800',
+    color: c.textPrimary,
     letterSpacing: -0.3,
   },
-  sectionSort: {
+  feedSub: {
+    marginTop: 2,
     fontSize: 12,
-    color: EVColors.primary,
+    color: c.textHint,
     fontWeight: '500',
   },
+  locateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: c.primary,
+  },
+  locateLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   empty: {
-    textAlign: 'center',
-    padding: 40,
-    color: EVColors.textHint,
+    paddingVertical: 48,
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyText: {
     fontSize: 14,
+    color: c.textHint,
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
   card: {
-    marginHorizontal: 20,
-    marginBottom: 12,
-    borderRadius: 20,
-    backgroundColor: EVColors.surface,
-    borderWidth: 1,
-    borderColor: EVColors.border,
-    overflow: 'hidden',
-  },
-  cardTop: {
+    marginHorizontal: 16,
+    marginBottom: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
     flexDirection: 'row',
-    padding: 16,
     gap: 12,
-    alignItems: 'flex-start',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.divider,
+  },
+  cardIconWrap: {
+    marginTop: 2,
   },
   cardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: EVColors.primaryLight,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: c.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: EVColors.textPrimary,
-    letterSpacing: -0.2,
-  },
-  cardAddress: {
-    marginTop: 2,
-    fontSize: 12,
-    color: EVColors.textHint,
-  },
-  cardDist: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: EVColors.textPrimary,
-  },
-  divider: { height: 1, backgroundColor: EVColors.divider },
-  cardBottom: {
+  cardBody: { flex: 1, minWidth: 0 },
+  cardTopRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    marginBottom: 6,
   },
-  connChip: {
-    paddingHorizontal: 8,
+  badge: {
+    paddingHorizontal: 9,
     paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
+    borderRadius: 20,
   },
-  powerChip: {
+  badgeText: { fontSize: 10, fontWeight: '700' },
+  cardDist: {
+    marginLeft: 'auto',
+    fontSize: 12,
+    fontWeight: '700',
+    color: c.primary,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: c.textPrimary,
+    lineHeight: 21,
+    letterSpacing: -0.2,
+  },
+  cardMetaLine: {
+    marginTop: 5,
+    fontSize: 12,
+    color: c.textSecondary,
+    fontWeight: '500',
+    lineHeight: 17,
+  },
+  cardStats: {
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    gap: 5,
   },
+  stat: {
+    fontSize: 11,
+    color: c.textHint,
+    fontWeight: '600',
+  },
+  divider: { height: 1, backgroundColor: c.divider },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   modalBackdrop: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   sheet: {
     maxHeight: '85%',
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingBottom: 24,
+    zIndex: 2,
+  },
+  sheetHeader: {
+    position: 'relative',
+    paddingTop: 10,
+    paddingBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetHandleHit: {
+    paddingVertical: 8,
+    paddingHorizontal: 40,
   },
   handle: {
-    alignSelf: 'center',
     width: 36,
     height: 4,
     borderRadius: 2,
     backgroundColor: 'rgba(173,196,180,0.4)',
-    marginTop: 12,
-    marginBottom: 16,
+  },
+  sheetCloseBtn: {
+    position: 'absolute',
+    right: 0,
+    top: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sheetTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     letterSpacing: -0.2,
   },
   sheetAddress: {
     marginTop: 4,
     fontSize: 12,
-    color: EVColors.textHint,
+    color: c.textHint,
   },
   sheetMeta: {
     marginTop: 8,
     fontSize: 11,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
   },
   sheetActions: {
     flexDirection: 'row',
@@ -1088,15 +1309,15 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: EVColors.border,
-    backgroundColor: EVColors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
   },
   outlineBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
-  filledBtn: {
+  actionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1104,18 +1325,18 @@ const styles = StyleSheet.create({
     gap: 6,
     height: 44,
     borderRadius: 12,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     paddingHorizontal: 12,
   },
   filledBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   commentsTitle: {
     marginTop: 12,
     fontWeight: '600',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   noComments: {
     marginTop: 8,
-    color: EVColors.textHint,
+    color: c.textHint,
     fontSize: 12,
   },
   commentItem: {
@@ -1128,62 +1349,80 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   commentInitials: {
     fontSize: 10,
     fontWeight: '700',
-    color: EVColors.primary,
+    color: c.primary,
   },
   commentAuthor: {
     fontSize: 12,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   commentStars: {
     fontSize: 11,
     fontWeight: '700',
     color: '#EF9F27',
   },
-  commentBody: { fontSize: 13, color: EVColors.textPrimary, marginTop: 2 },
-  commentTime: { fontSize: 11, color: EVColors.textHint, marginTop: 2 },
-  innerModal: {
-    marginTop: 12,
-    padding: 16,
+  commentBody: { fontSize: 13, color: c.textPrimary, marginTop: 2 },
+  commentTime: { fontSize: 11, color: c.textHint, marginTop: 2 },
+  composerWrap: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.divider,
+    paddingTop: 10,
+  },
+  composerCard: {
+    padding: 14,
     borderRadius: 16,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
+  },
+  composerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   innerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: EVColors.textPrimary,
-    marginBottom: 12,
+    color: c.textPrimary,
   },
   starsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 4,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   innerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 16,
+    gap: 10,
   },
-  cancelText: { color: EVColors.textSecondary, fontWeight: '500' },
+  cancelBtn: {
+    height: 44,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelText: { color: c.textSecondary, fontWeight: '600' },
   commentInput: {
-    minHeight: 80,
+    minHeight: 90,
+    maxHeight: 140,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
     textAlignVertical: 'top',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
+    backgroundColor: c.background,
   },
 });
+}

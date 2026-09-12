@@ -17,7 +17,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import {
   CATEGORY_BADGE,
   ForumTopic,
@@ -47,6 +48,7 @@ const GARAGE_YEARS = Array.from({ length: CURRENT_YEAR - 2010 + 1 }, (_, i) =>
 );
 
 export function ProfileScreen() {
+  const { colors, styles } = useStyles();
   const navigation = useNavigation<Nav>();
   const {
     user,
@@ -89,7 +91,7 @@ export function ProfileScreen() {
             .slice(0, 2)
             .join('')
             .toUpperCase(),
-          color: EVColors.primary,
+          color: colors.primary,
         }),
         fetchForumTopicsByAuthor(user.uid),
         fetchListingsBySeller(user.uid),
@@ -189,8 +191,8 @@ export function ProfileScreen() {
               setRefreshing(true);
               void load();
             }}
-            tintColor={EVColors.primary}
-            colors={[EVColors.primary]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
@@ -199,11 +201,23 @@ export function ProfileScreen() {
             <Text style={styles.appTitle}>Profilim</Text>
             <View style={styles.appBarActions}>
               <HeaderMessagesButton compact />
+              <Pressable
+                style={styles.iconBtn}
+                onPress={() => navigation.navigate('Settings')}
+                accessibilityLabel="Ayarlar"
+                hitSlop={6}
+              >
+                <Ionicons
+                  name="settings-outline"
+                  size={20}
+                  color={colors.textPrimary}
+                />
+              </Pressable>
               <Pressable style={styles.iconBtn} onPress={onLogout}>
                 <Ionicons
                   name="log-out-outline"
                   size={20}
-                  color={EVColors.textPrimary}
+                  color={colors.textPrimary}
                 />
               </Pressable>
             </View>
@@ -211,7 +225,7 @@ export function ProfileScreen() {
 
           {loading && !profile ? (
             <ActivityIndicator
-              color={EVColors.primary}
+              color={colors.primary}
               style={{ marginVertical: 40 }}
             />
           ) : (
@@ -222,11 +236,11 @@ export function ProfileScreen() {
                     styles.avatar,
                     {
                       backgroundColor: hexWithAlpha(
-                        profile?.color ?? EVColors.primary,
+                        profile?.color ?? colors.primary,
                         0.15,
                       ),
                       borderColor: hexWithAlpha(
-                        profile?.color ?? EVColors.primary,
+                        profile?.color ?? colors.primary,
                         0.35,
                       ),
                     },
@@ -235,7 +249,7 @@ export function ProfileScreen() {
                   <Text
                     style={[
                       styles.avatarText,
-                      { color: profile?.color ?? EVColors.primary },
+                      { color: profile?.color ?? colors.primary },
                     ]}
                   >
                     {profile?.initials ?? 'EV'}
@@ -274,7 +288,7 @@ export function ProfileScreen() {
                     {profile?.displayName ?? 'Kullanıcı'}
                   </Text>
                   <View style={styles.evBadge}>
-                    <Ionicons name="flash" size={11} color={EVColors.primary} />
+                    <Ionicons name="flash" size={11} color={colors.primary} />
                     <Text style={styles.evBadgeText}>EV Sürücüsü</Text>
                   </View>
                 </View>
@@ -286,7 +300,7 @@ export function ProfileScreen() {
                   <Ionicons
                     name="calendar-outline"
                     size={13}
-                    color={EVColors.textHint}
+                    color={colors.textHint}
                   />
                   <Text style={styles.joinText}>
                     Katılım: {formatJoinDate(profile?.createdAt ?? null)}
@@ -336,13 +350,13 @@ export function ProfileScreen() {
                       : 'mail-unread-outline'
                   }
                   size={20}
-                  color={emailVerified ? EVColors.primary : '#C46B00'}
+                  color={emailVerified ? colors.primary : '#C46B00'}
                 />
                 <View style={{ flex: 1 }}>
                   <Text
                     style={[
                       styles.verifyTitle,
-                      emailVerified && { color: EVColors.primary },
+                      emailVerified && { color: colors.primary },
                     ]}
                   >
                     {emailVerified
@@ -420,13 +434,13 @@ export function ProfileScreen() {
                 <Ionicons
                   name="bookmark-outline"
                   size={18}
-                  color={EVColors.primary}
+                  color={colors.primary}
                 />
                 <Text style={styles.savedBtnText}>Kaydedilen konular</Text>
                 <Ionicons
                   name="chevron-forward"
                   size={18}
-                  color={EVColors.textHint}
+                  color={colors.textHint}
                 />
               </Pressable>
             </>
@@ -453,7 +467,7 @@ export function ProfileScreen() {
                     style={[
                       styles.tabLabel,
                       {
-                        color: active ? EVColors.primary : EVColors.textHint,
+                        color: active ? colors.primary : colors.textHint,
                         fontWeight: active ? '700' : '500',
                       },
                     ]}
@@ -539,7 +553,7 @@ export function ProfileScreen() {
               value={newEmail}
               onChangeText={setNewEmail}
               placeholder="Yeni e-posta"
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
@@ -549,7 +563,7 @@ export function ProfileScreen() {
               value={emailPassword}
               onChangeText={setEmailPassword}
               placeholder="Şifren"
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
               secureTextEntry
               autoComplete="password"
             />
@@ -591,7 +605,7 @@ export function ProfileScreen() {
               onPress={() => setShowChangeEmail(false)}
               style={{ marginTop: 12, alignItems: 'center' }}
             >
-              <Text style={{ color: EVColors.textHint, fontWeight: '600' }}>
+              <Text style={{ color: colors.textHint, fontWeight: '600' }}>
                 Vazgeç
               </Text>
             </Pressable>
@@ -611,13 +625,14 @@ function StatCol({
   label: string;
   onPress?: () => void;
 }) {
+  const { colors, styles } = useStyles();
   const content = (
     <>
       <Text style={styles.statValue}>{value}</Text>
       <Text
         style={[
           styles.statLabel,
-          onPress ? { color: EVColors.primary, fontWeight: '600' } : null,
+          onPress ? { color: colors.primary, fontWeight: '600' } : null,
         ]}
       >
         {label}
@@ -648,10 +663,11 @@ function GarageTab({
   listingCount: number;
   onEdit: () => void;
 }) {
+  const { colors, styles } = useStyles();
   const brandColor =
     EV_BRANDS.find(
       (b) => b.name.toLowerCase() === garage?.brand.toLowerCase(),
-    )?.color ?? EVColors.primary;
+    )?.color ?? colors.primary;
 
   return (
     <View style={styles.pad}>
@@ -692,7 +708,7 @@ function GarageTab({
         </View>
       ) : (
         <View style={styles.emptyGarage}>
-          <Ionicons name="car-outline" size={36} color={EVColors.textHint} />
+          <Ionicons name="car-outline" size={36} color={colors.textHint} />
           <Text style={styles.emptyTitle}>Garajın boş</Text>
           <Text style={styles.emptyBody}>
             Kullandığın EV’yi ekleyerek profilini tamamla.
@@ -704,7 +720,7 @@ function GarageTab({
         <Ionicons
           name={garage ? 'create-outline' : 'add-circle-outline'}
           size={18}
-          color={EVColors.primary}
+          color={colors.primary}
         />
         <Text style={styles.garageEditText}>
           {garage ? 'Garajı düzenle' : 'Araç ekle'}
@@ -731,7 +747,7 @@ function GarageTab({
           icon="swap-horizontal"
           value={String(listingCount)}
           label="2. El ilanı"
-          color={EVColors.primary}
+          color={colors.primary}
         />
         <ActivityCard
           icon="flash"
@@ -753,6 +769,7 @@ function VehicleStat({
   value: string;
   label: string;
 }) {
+  const { colors, styles } = useStyles();
   return (
     <View style={styles.vStat}>
       <Ionicons name={icon} size={16} color="#fff" />
@@ -763,6 +780,7 @@ function VehicleStat({
 }
 
 function SectionHeader({ title }: { title: string }) {
+  const { colors, styles } = useStyles();
   return (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionBar} />
@@ -782,6 +800,7 @@ function ActivityCard({
   label: string;
   color: string;
 }) {
+  const { colors, styles } = useStyles();
   return (
     <View style={styles.activityCard}>
       <View
@@ -809,9 +828,10 @@ function ForumTab({
   loading: boolean;
   onOpen: (t: ForumTopic) => void;
 }) {
+  const { colors, styles } = useStyles();
   if (loading && topics.length === 0) {
     return (
-      <ActivityIndicator color={EVColors.primary} style={{ marginTop: 40 }} />
+      <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
     );
   }
   if (topics.length === 0) {
@@ -866,9 +886,10 @@ function ListingsTab({
   loading: boolean;
   onOpen: (l: EvListing) => void;
 }) {
+  const { colors, styles } = useStyles();
   if (loading && listings.length === 0) {
     return (
-      <ActivityIndicator color={EVColors.primary} style={{ marginTop: 40 }} />
+      <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
     );
   }
   if (listings.length === 0) {
@@ -906,14 +927,14 @@ function ListingsTab({
             <View
               style={[
                 styles.statusPill,
-                { backgroundColor: EVColors.primaryLight },
+                { backgroundColor: colors.primaryLight },
               ]}
             >
               <Text
                 style={{
                   fontSize: 11,
                   fontWeight: '700',
-                  color: EVColors.primary,
+                  color: colors.primary,
                 }}
               >
                 Aktif
@@ -942,6 +963,7 @@ function EditProfileModal({
   onClose: () => void;
   onSave: (name: string, bio: string) => void;
 }) {
+  const { colors, styles } = useStyles();
   const [n, setN] = useState(name);
   const [b, setB] = useState(bio);
 
@@ -953,7 +975,12 @@ function EditProfileModal({
   }, [visible, name, bio]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         style={styles.modalRoot}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -964,7 +991,7 @@ function EditProfileModal({
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Profili Düzenle</Text>
             <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={18} color={EVColors.textSecondary} />
+              <Ionicons name="close" size={18} color={colors.textSecondary} />
             </Pressable>
           </View>
           <ScrollView keyboardShouldPersistTaps="handled">
@@ -982,7 +1009,7 @@ function EditProfileModal({
               multiline
             />
             <View style={styles.hintBox}>
-              <Ionicons name="flash" size={16} color={EVColors.primary} />
+              <Ionicons name="flash" size={16} color={colors.primary} />
               <Text style={styles.hintText}>
                 Kullanıcı adın e-posta adresinden oluşur. Araç bilgilerini Garaj
                 sekmesinden güncelleyebilirsin.
@@ -1019,6 +1046,7 @@ function EditGarageModal({
   onClose: () => void;
   onSave: (garage: UserGarage | null) => void;
 }) {
+  const { colors, styles } = useStyles();
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
@@ -1058,7 +1086,12 @@ function EditGarageModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         style={styles.modalRoot}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1069,7 +1102,7 @@ function EditGarageModal({
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Garaj</Text>
             <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={18} color={EVColors.textSecondary} />
+              <Ionicons name="close" size={18} color={colors.textSecondary} />
             </Pressable>
           </View>
           <ScrollView keyboardShouldPersistTaps="handled">
@@ -1135,8 +1168,8 @@ function EditGarageModal({
                         style={[
                           styles.brandChip,
                           active && {
-                            backgroundColor: EVColors.primaryLight,
-                            borderColor: EVColors.primary,
+                            backgroundColor: colors.primaryLight,
+                            borderColor: colors.primary,
                           },
                         ]}
                         onPress={() => setModel(m)}
@@ -1144,7 +1177,7 @@ function EditGarageModal({
                         <Text
                           style={[
                             styles.brandChipText,
-                            active && { color: EVColors.primary },
+                            active && { color: colors.primary },
                           ]}
                         >
                           {m}
@@ -1178,8 +1211,8 @@ function EditGarageModal({
                     style={[
                       styles.brandChip,
                       active && {
-                        backgroundColor: EVColors.primaryLight,
-                        borderColor: EVColors.primary,
+                        backgroundColor: colors.primaryLight,
+                        borderColor: colors.primary,
                       },
                     ]}
                     onPress={() => setYear(y)}
@@ -1187,7 +1220,7 @@ function EditGarageModal({
                     <Text
                       style={[
                         styles.brandChipText,
-                        active && { color: EVColors.primary },
+                        active && { color: colors.primary },
                       ]}
                     >
                       {y}
@@ -1265,6 +1298,7 @@ function Field({
   placeholder: string;
   multiline?: boolean;
 }) {
+  const { colors, styles } = useStyles();
   return (
     <View style={{ marginBottom: 14 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -1276,15 +1310,22 @@ function Field({
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
-        placeholderTextColor={EVColors.textHint}
+        placeholderTextColor={colors.textHint}
         multiline={multiline}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: EVColors.background },
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.background },
   center: { alignItems: 'center', justifyContent: 'center' },
   header: { paddingBottom: 4 },
   appBar: {
@@ -1302,16 +1343,16 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     letterSpacing: -0.4,
   },
   iconBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1337,25 +1378,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 12,
   },
-  vDiv: { width: 1, height: 28, backgroundColor: EVColors.border },
+  vDiv: { width: 1, height: 28, backgroundColor: c.border },
   statValue: {
     fontSize: 16,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
-  statLabel: { fontSize: 11, color: EVColors.textSecondary, marginTop: 2 },
+  statLabel: { fontSize: 11, color: c.textSecondary, marginTop: 2 },
   identity: { paddingHorizontal: 20, marginTop: 14 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   name: {
     fontSize: 16,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   evBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -1363,18 +1404,18 @@ const styles = StyleSheet.create({
   evBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: EVColors.primary,
+    color: c.primary,
   },
   nick: {
     marginTop: 2,
     fontSize: 13,
-    color: EVColors.textHint,
+    color: c.textHint,
     fontWeight: '500',
   },
   email: {
     marginTop: 2,
     fontSize: 12,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
   },
   joinRow: {
     marginTop: 6,
@@ -1382,17 +1423,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  joinText: { fontSize: 12, color: EVColors.textHint },
+  joinText: { fontSize: 12, color: c.textHint },
   bio: {
     marginTop: 8,
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     lineHeight: 18,
   },
   bioPlaceholder: {
     marginTop: 8,
     fontSize: 13,
-    color: EVColors.textHint,
+    color: c.textHint,
     fontStyle: 'italic',
   },
   carChip: {
@@ -1404,31 +1445,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   carChipText: {
     fontSize: 12,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
-  carYear: { fontSize: 12, color: EVColors.textHint },
+  carYear: { fontSize: 12, color: c.textHint },
   editBtn: {
     marginHorizontal: 20,
     marginTop: 16,
     height: 38,
     borderRadius: 10,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   editBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   verifyBanner: {
     marginHorizontal: 20,
@@ -1443,8 +1484,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   verifyBannerOk: {
-    backgroundColor: EVColors.primaryLight,
-    borderColor: EVColors.primaryMid,
+    backgroundColor: c.primaryLight,
+    borderColor: c.primaryMid,
   },
   verifyTitle: {
     fontSize: 13,
@@ -1454,13 +1495,13 @@ const styles = StyleSheet.create({
   verifyBody: {
     marginTop: 2,
     fontSize: 12,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     lineHeight: 17,
   },
   verifyBodyOk: {
     marginTop: 2,
     fontSize: 12,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     lineHeight: 17,
   },
   verifyActions: {
@@ -1472,18 +1513,22 @@ const styles = StyleSheet.create({
   verifyLink: {
     fontSize: 12,
     fontWeight: '700',
-    color: EVColors.primary,
+    color: c.primary,
   },
   emailModalWrap: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   emailModalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   emailModalCard: {
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -1492,34 +1537,34 @@ const styles = StyleSheet.create({
   emailModalTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   emailModalSub: {
     marginTop: 6,
     marginBottom: 14,
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
   },
   emailModalInput: {
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: EVColors.textPrimary,
-    backgroundColor: EVColors.background,
+    color: c.textPrimary,
+    backgroundColor: c.background,
     marginBottom: 10,
   },
   emailModalHint: {
     fontSize: 12,
-    color: EVColors.textHint,
+    color: c.textHint,
     marginBottom: 14,
   },
   emailModalBtn: {
     height: 48,
     borderRadius: 14,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1533,9 +1578,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     height: 44,
     borderRadius: 12,
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     borderWidth: 1,
-    borderColor: EVColors.primaryMid,
+    borderColor: c.primaryMid,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
@@ -1545,13 +1590,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
-    color: EVColors.primary,
+    color: c.primary,
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
     borderBottomWidth: 1,
-    borderBottomColor: EVColors.divider,
+    borderBottomColor: c.divider,
     paddingTop: 8,
   },
   tab: { flex: 1, alignItems: 'center', paddingBottom: 10 },
@@ -1562,7 +1607,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 2.5,
     width: '60%',
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     borderRadius: 2,
   },
   tabBody: { minHeight: 360 },
@@ -1570,12 +1615,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     marginTop: 8,
   },
   emptyBody: {
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     marginTop: 4,
     lineHeight: 18,
@@ -1585,9 +1630,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 28,
     borderRadius: 16,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   garageEditBtn: {
     flexDirection: 'row',
@@ -1596,14 +1641,14 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 42,
     borderRadius: 12,
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     borderWidth: 1,
-    borderColor: EVColors.primaryMid,
+    borderColor: c.primaryMid,
   },
   garageEditText: {
     fontSize: 13,
     fontWeight: '700',
-    color: EVColors.primary,
+    color: c.primary,
   },
   vehicleCard: {
     borderRadius: 20,
@@ -1664,12 +1709,12 @@ const styles = StyleSheet.create({
     width: 4,
     height: 16,
     borderRadius: 2,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   activityRow: { flexDirection: 'row', gap: 12 },
   activityCard: {
@@ -1679,9 +1724,9 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   activityIcon: {
     width: 36,
@@ -1693,45 +1738,45 @@ const styles = StyleSheet.create({
   activityValue: {
     fontSize: 16,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
-  activityLabel: { fontSize: 10, color: EVColors.textSecondary },
+  activityLabel: { fontSize: 10, color: c.textSecondary },
   postCard: {
     padding: 14,
     borderRadius: 14,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   postThumb: {
     width: '100%',
     height: 120,
     borderRadius: 10,
     marginBottom: 8,
-    backgroundColor: EVColors.divider,
+    backgroundColor: c.divider,
   },
   postCat: {
     fontSize: 11,
     fontWeight: '600',
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
   },
   postTitle: {
     marginTop: 6,
     fontSize: 14,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     lineHeight: 19,
   },
   postMeta: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  postMetaText: { fontSize: 11, color: EVColors.textHint },
+  postMetaText: { fontSize: 11, color: c.textHint },
   listingCard: {
     flexDirection: 'row',
     gap: 12,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   listingEmoji: {
     width: 56,
@@ -1743,14 +1788,14 @@ const styles = StyleSheet.create({
   listingModel: {
     fontSize: 14,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
-  listingLoc: { fontSize: 12, color: EVColors.textHint, marginTop: 2 },
+  listingLoc: { fontSize: 12, color: c.textHint, marginTop: 2 },
   listingPrice: {
     marginTop: 4,
     fontSize: 14,
     fontWeight: '800',
-    color: EVColors.primary,
+    color: c.primary,
   },
   statusPill: {
     paddingHorizontal: 8,
@@ -1761,16 +1806,20 @@ const styles = StyleSheet.create({
   listingTime: {
     marginTop: 6,
     fontSize: 11,
-    color: EVColors.textHint,
+    color: c.textHint,
     textAlign: 'right',
   },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   sheet: {
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -1794,32 +1843,32 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   closeBtn: {
     marginLeft: 'auto',
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: EVColors.divider,
+    backgroundColor: c.divider,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fieldLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     marginBottom: 6,
   },
   field: {
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   brandChip: {
     flexDirection: 'row',
@@ -1829,26 +1878,26 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: EVColors.border,
-    backgroundColor: EVColors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
   },
   brandChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   hintBox: {
     flexDirection: 'row',
     gap: 8,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     marginBottom: 16,
   },
   hintText: {
     flex: 1,
     fontSize: 12,
-    color: EVColors.primary,
+    color: c.primary,
     fontWeight: '500',
   },
   removeGarageBtn: {
@@ -1869,10 +1918,11 @@ const styles = StyleSheet.create({
   saveBtn: {
     height: 52,
     borderRadius: 14,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   saveText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
+}

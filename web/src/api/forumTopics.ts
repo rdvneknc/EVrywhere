@@ -20,6 +20,10 @@ import type { User } from 'firebase/auth';
 import { db } from '../lib/firebase';
 import { EV_PRIMARY, type ForumTopic } from '../data/forum';
 import { assertRateLimit } from '../lib/rateLimit';
+import {
+  FIRESTORE_COVER_BYTES,
+  compressFileToJpegDataUri,
+} from '../lib/imageCompress';
 
 const COLLECTION = 'forum_topics';
 
@@ -120,6 +124,8 @@ export async function createForumTopic(
     title: string;
     excerpt: string;
     categoryId: string;
+    /** Opsiyonel kapak görseli */
+    photoFile?: File | null;
   },
 ): Promise<string> {
   const title = input.title.trim();
@@ -134,7 +140,19 @@ export async function createForumTopic(
     user.email?.split('@')[0] ||
     'Kullanıcı';
 
-  const ref = await addDoc(collection(db, COLLECTION), {
+  let photoUrl: string | undefined;
+  if (input.photoFile) {
+    if (!input.photoFile.type.startsWith('image/')) {
+      throw new Error('Sadece görsel dosyası eklenebilir.');
+    }
+    photoUrl = await compressFileToJpegDataUri(
+      input.photoFile,
+      FIRESTORE_COVER_BYTES,
+      1200,
+    );
+  }
+
+  const payload: Record<string, unknown> = {
     title,
     excerpt,
     authorName,
@@ -149,7 +167,12 @@ export async function createForumTopic(
     isHot: false,
     readTime: '1 dk',
     createdAt: serverTimestamp(),
-  });
+  };
+  if (photoUrl) {
+    payload.photoUrl = photoUrl;
+  }
+
+  const ref = await addDoc(collection(db, COLLECTION), payload);
   return ref.id;
 }
 

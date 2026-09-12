@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { RootStackParamList } from '../navigation/types';
 import { CATEGORY_BADGE, hexWithAlpha } from '../data/forum';
 import { useAuth } from '../auth/AuthContext';
@@ -25,6 +26,7 @@ import {
 type Props = NativeStackScreenProps<RootStackParamList, 'SavedTopics'>;
 
 export function SavedTopicsScreen({ navigation }: Props) {
+  const { colors, styles } = useStyles();
   const { user } = useAuth();
   const [items, setItems] = useState<SavedTopicPreview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +68,7 @@ export function SavedTopicsScreen({ navigation }: Props) {
           <Ionicons
             name="chevron-back"
             size={22}
-            color={EVColors.textPrimary}
+            color={colors.textPrimary}
           />
         </Pressable>
         <Text style={styles.topTitle}>Kaydedilenler</Text>
@@ -84,14 +86,14 @@ export function SavedTopicsScreen({ navigation }: Props) {
               setRefreshing(true);
               setTimeout(() => setRefreshing(false), 400);
             }}
-            tintColor={EVColors.primary}
-            colors={[EVColors.primary]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
         {loading ? (
           <ActivityIndicator
-            color={EVColors.primary}
+            color={colors.primary}
             style={{ marginTop: 40 }}
           />
         ) : items.length === 0 ? (
@@ -99,7 +101,7 @@ export function SavedTopicsScreen({ navigation }: Props) {
             <Ionicons
               name="bookmark-outline"
               size={40}
-              color={EVColors.primary}
+              color={colors.primary}
             />
             <Text style={styles.emptyTitle}>Henüz kayıt yok</Text>
             <Text style={styles.emptyBody}>
@@ -153,12 +155,12 @@ export function SavedTopicsScreen({ navigation }: Props) {
                   </Text>
                 </View>
                 {openingId === item.topicId ? (
-                  <ActivityIndicator color={EVColors.primary} />
+                  <ActivityIndicator color={colors.primary} />
                 ) : (
                   <Ionicons
                     name="chevron-forward"
                     size={18}
-                    color={EVColors.textHint}
+                    color={colors.textHint}
                   />
                 )}
               </Pressable>
@@ -170,8 +172,15 @@ export function SavedTopicsScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: EVColors.background },
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -182,7 +191,7 @@ const styles = StyleSheet.create({
   topTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   list: { paddingHorizontal: 16, paddingBottom: 24 },
   emptyScroll: { flexGrow: 1 },
@@ -197,12 +206,12 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 17,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   emptyBody: {
     marginTop: 8,
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
   },
@@ -213,15 +222,15 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
     borderRadius: 16,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   thumb: {
     width: 64,
     height: 64,
     borderRadius: 12,
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
   },
   thumbPlaceholder: {
     width: 64,
@@ -241,12 +250,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     lineHeight: 19,
   },
   meta: {
     marginTop: 4,
     fontSize: 12,
-    color: EVColors.textHint,
+    color: c.textHint,
   },
 });
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { RootStackParamList } from '../navigation/types';
 import {
   EvListing,
@@ -47,6 +48,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ListingDetail'>;
 const { width } = Dimensions.get('window');
 
 export function ListingDetailScreen({ navigation, route }: Props) {
+  const { colors, styles } = useStyles();
   const { listing: initial } = route.params;
   const { user } = useAuth();
   const { relationWith } = useBlockLists();
@@ -193,7 +195,7 @@ export function ListingDetailScreen({ navigation, route }: Props) {
             <Ionicons
               name="chevron-back"
               size={22}
-              color={EVColors.textPrimary}
+              color={colors.textPrimary}
             />
           </Pressable>
           <View style={{ paddingHorizontal: 24, paddingTop: 40 }}>
@@ -215,7 +217,7 @@ export function ListingDetailScreen({ navigation, route }: Props) {
               style={{
                 textAlign: 'center',
                 marginTop: 12,
-                color: EVColors.textSecondary,
+                color: colors.textSecondary,
                 fontSize: 14,
               }}
             >
@@ -283,7 +285,7 @@ export function ListingDetailScreen({ navigation, route }: Props) {
                 styles.badge,
                 {
                   backgroundColor: damageOk
-                    ? EVColors.primaryLight
+                    ? colors.primaryLight
                     : '#FFEBEE',
                 },
               ]}
@@ -292,20 +294,20 @@ export function ListingDetailScreen({ navigation, route }: Props) {
                 style={{
                   fontSize: 12,
                   fontWeight: '700',
-                  color: damageOk ? EVColors.primary : EVColors.error,
+                  color: damageOk ? colors.primary : colors.error,
                 }}
               >
                 {listing.damageStatus}
               </Text>
             </View>
             <View
-              style={[styles.badge, { backgroundColor: EVColors.primaryLight }]}
+              style={[styles.badge, { backgroundColor: colors.primaryLight }]}
             >
               <Text
                 style={{
                   fontSize: 12,
                   fontWeight: '700',
-                  color: EVColors.primary,
+                  color: colors.primary,
                 }}
               >
                 {listing.sellerType}
@@ -367,7 +369,7 @@ export function ListingDetailScreen({ navigation, route }: Props) {
               <Ionicons
                 name="chevron-forward"
                 size={18}
-                color={EVColors.textHint}
+                color={colors.textHint}
               />
             ) : null}
           </Pressable>
@@ -387,7 +389,7 @@ export function ListingDetailScreen({ navigation, route }: Props) {
               <Ionicons
                 name="flag-outline"
                 size={16}
-                color={EVColors.textHint}
+                color={colors.textHint}
               />
               <Text style={styles.reportLinkText}>İlanı şikayet et</Text>
             </Pressable>
@@ -402,7 +404,7 @@ export function ListingDetailScreen({ navigation, route }: Props) {
             <Ionicons
               name="chevron-back"
               size={22}
-              color={EVColors.textPrimary}
+              color={colors.textPrimary}
             />
           </Pressable>
           {isOwner ? (
@@ -411,7 +413,7 @@ export function ListingDetailScreen({ navigation, route }: Props) {
                 <Ionicons
                   name="create-outline"
                   size={20}
-                  color={EVColors.textPrimary}
+                  color={colors.textPrimary}
                 />
               </Pressable>
               <Pressable
@@ -420,12 +422,12 @@ export function ListingDetailScreen({ navigation, route }: Props) {
                 disabled={deleting}
               >
                 {deleting ? (
-                  <ActivityIndicator color={EVColors.error} />
+                  <ActivityIndicator color={colors.error} />
                 ) : (
                   <Ionicons
                     name="trash-outline"
                     size={20}
-                    color={EVColors.error}
+                    color={colors.error}
                   />
                 )}
               </Pressable>
@@ -443,7 +445,7 @@ export function ListingDetailScreen({ navigation, route }: Props) {
             <Ionicons
               name="create-outline"
               size={18}
-              color={EVColors.primary}
+              color={colors.primary}
             />
             <Text style={styles.ownerEditText}>İlanı düzenle</Text>
           </Pressable>
@@ -454,9 +456,9 @@ export function ListingDetailScreen({ navigation, route }: Props) {
                 styles.followWide,
                 {
                   backgroundColor: followed
-                    ? EVColors.primaryLight
-                    : EVColors.surface,
-                  borderColor: followed ? EVColors.primary : EVColors.border,
+                    ? colors.primaryLight
+                    : colors.surface,
+                  borderColor: followed ? colors.primary : colors.border,
                 },
               ]}
               onPress={() => {
@@ -488,12 +490,12 @@ export function ListingDetailScreen({ navigation, route }: Props) {
               <Ionicons
                 name={followed ? 'notifications' : 'notifications-outline'}
                 size={18}
-                color={followed ? EVColors.primary : EVColors.textSecondary}
+                color={followed ? colors.primary : colors.textSecondary}
               />
               <Text
                 style={{
                   fontWeight: '700',
-                  color: followed ? EVColors.primary : EVColors.textSecondary,
+                  color: followed ? colors.primary : colors.textSecondary,
                 }}
               >
                 {followed ? 'Takip Ediliyor' : 'Fiyatı Takip Et'}
@@ -515,7 +517,7 @@ export function ListingDetailScreen({ navigation, route }: Props) {
                 <Ionicons
                   name="call-outline"
                   size={18}
-                  color={EVColors.primary}
+                  color={colors.primary}
                 />
                 <Text style={styles.callText}>Ara</Text>
               </Pressable>
@@ -550,6 +552,7 @@ function EditListingModal({
   onClose: () => void;
   onSaved: (listing: EvListing) => void;
 }) {
+  const { colors, styles } = useStyles();
   const [price, setPrice] = useState(String(listing.price));
   const [km, setKm] = useState(String(listing.km));
   const [city, setCity] = useState(listing.location);
@@ -617,7 +620,12 @@ function EditListingModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         style={styles.editRoot}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -632,7 +640,7 @@ function EditListingModal({
               value={price}
               onChangeText={setPrice}
               keyboardType="numeric"
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
             />
             <Text style={styles.editLabel}>Kilometre</Text>
             <TextInput
@@ -640,14 +648,14 @@ function EditListingModal({
               value={km}
               onChangeText={setKm}
               keyboardType="numeric"
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
             />
             <Text style={styles.editLabel}>Şehir</Text>
             <TextInput
               style={styles.editField}
               value={city}
               onChangeText={setCity}
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
             />
             <Text style={styles.editLabel}>Batarya sağlığı (%)</Text>
             <TextInput
@@ -655,7 +663,7 @@ function EditListingModal({
               value={batteryHealth}
               onChangeText={setBatteryHealth}
               keyboardType="numeric"
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
             />
             <Text style={styles.editLabel}>Açıklama</Text>
             <TextInput
@@ -663,7 +671,7 @@ function EditListingModal({
               value={description}
               onChangeText={setDescription}
               multiline
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
             />
             <Text style={styles.editLabel}>Kimden</Text>
             <View style={styles.chipRow}>
@@ -721,8 +729,15 @@ function EditListingModal({
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: EVColors.background },
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.background },
   hero: { height: 280, backgroundColor: '#111' },
   heroFallback: {
     height: 280,
@@ -757,7 +772,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     letterSpacing: -0.3,
   },
   badges: { flexDirection: 'row', gap: 8, marginTop: 10 },
@@ -768,10 +783,10 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     marginTop: 16,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     padding: 14,
   },
   infoRow: {
@@ -779,23 +794,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: EVColors.divider,
+    borderBottomColor: c.divider,
   },
-  infoLabel: { fontSize: 13, color: EVColors.textSecondary },
+  infoLabel: { fontSize: 13, color: c.textSecondary },
   infoValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     marginBottom: 8,
   },
   parts: {
     fontSize: 13,
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     marginBottom: 4,
     lineHeight: 18,
   },
@@ -806,9 +821,9 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   avatar: {
     width: 44,
@@ -821,11 +836,11 @@ const styles = StyleSheet.create({
   sellerName: {
     fontSize: 14,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
-  posted: { fontSize: 12, color: EVColors.textHint, marginTop: 2 },
+  posted: { fontSize: 12, color: c.textHint, marginTop: 2 },
   communityChip: {
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
@@ -833,7 +848,7 @@ const styles = StyleSheet.create({
   communityText: {
     fontSize: 11,
     fontWeight: '700',
-    color: EVColors.primary,
+    color: c.primary,
   },
   reportLink: {
     marginTop: 14,
@@ -842,7 +857,7 @@ const styles = StyleSheet.create({
     gap: 6,
     alignSelf: 'center',
   },
-  reportLinkText: { fontSize: 12, color: EVColors.textHint, fontWeight: '600' },
+  reportLinkText: { fontSize: 12, color: c.textHint, fontWeight: '600' },
   topOverlay: {
     position: 'absolute',
     top: 0,
@@ -871,9 +886,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 16,
     paddingTop: 10,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderTopWidth: 1,
-    borderTopColor: EVColors.divider,
+    borderTopColor: c.divider,
     gap: 10,
   },
   followWide: {
@@ -889,20 +904,20 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: EVColors.primary,
-    backgroundColor: EVColors.primaryLight,
+    borderColor: c.primary,
+    backgroundColor: c.primaryLight,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  ownerEditText: { color: EVColors.primary, fontWeight: '700', fontSize: 15 },
+  ownerEditText: { color: c.primary, fontWeight: '700', fontSize: 15 },
   actionRow: { flexDirection: 'row', gap: 10 },
   msgBtn: {
     flex: 1,
     height: 48,
     borderRadius: 14,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -913,22 +928,26 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 14,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.primary,
+    borderColor: c.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  callText: { color: EVColors.primary, fontWeight: '700' },
+  callText: { color: c.primary, fontWeight: '700' },
   editRoot: { flex: 1, justifyContent: 'flex-end' },
   editBackdrop: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   editSheet: {
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -939,25 +958,25 @@ const styles = StyleSheet.create({
   editTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     marginBottom: 12,
   },
   editLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     marginBottom: 6,
     marginTop: 8,
   },
   editField: {
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   chip: {
@@ -965,23 +984,24 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: EVColors.border,
-    backgroundColor: EVColors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
   },
   chipActive: {
-    backgroundColor: EVColors.primary,
-    borderColor: EVColors.primary,
+    backgroundColor: c.primary,
+    borderColor: c.primary,
   },
-  chipText: { fontSize: 12, fontWeight: '600', color: EVColors.textSecondary },
+  chipText: { fontSize: 12, fontWeight: '600', color: c.textSecondary },
   chipTextActive: { color: '#fff' },
   saveBtn: {
     marginTop: 16,
     height: 50,
     borderRadius: 14,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   saveText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
+}

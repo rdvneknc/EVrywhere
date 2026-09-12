@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { RootStackParamList } from '../navigation/types';
 import { hexWithAlpha } from '../data/forum';
 import { useAuth } from '../auth/AuthContext';
@@ -37,6 +38,7 @@ import { useBlockLists } from '../hooks/useBlockLists';
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
 export function ChatScreen({ navigation, route }: Props) {
+  const { colors, styles } = useStyles();
   const { conversationId } = route.params;
   const { user } = useAuth();
   const { blockedIds, blockedByIds } = useBlockLists();
@@ -139,7 +141,7 @@ export function ChatScreen({ navigation, route }: Props) {
     return (
       <SafeAreaView style={styles.safe}>
         <Pressable onPress={() => navigation.goBack()} style={styles.back}>
-          <Ionicons name="chevron-back" size={22} color={EVColors.textPrimary} />
+          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.missing}>Konuşma bulunamadı</Text>
       </SafeAreaView>
@@ -157,7 +159,7 @@ export function ChatScreen({ navigation, route }: Props) {
             <Ionicons
               name="chevron-back"
               size={22}
-              color={EVColors.textPrimary}
+              color={colors.textPrimary}
             />
           </Pressable>
           {peer ? (
@@ -197,13 +199,13 @@ export function ChatScreen({ navigation, route }: Props) {
               </View>
             </Pressable>
           ) : (
-            <ActivityIndicator color={EVColors.primary} />
+            <ActivityIndicator color={colors.primary} />
           )}
         </View>
 
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="large" color={EVColors.primary} />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <ScrollView
@@ -231,7 +233,7 @@ export function ChatScreen({ navigation, route }: Props) {
                   <Text
                     style={[
                       styles.bubbleText,
-                      { color: m.fromMe ? '#fff' : EVColors.textPrimary },
+                      { color: m.fromMe ? '#fff' : colors.textPrimary },
                     ]}
                   >
                     {m.text}
@@ -268,7 +270,7 @@ export function ChatScreen({ navigation, route }: Props) {
               value={text}
               onChangeText={setText}
               placeholder="Mesaj yaz…"
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
             />
             <Pressable
               style={[styles.send, sending && { opacity: 0.7 }]}
@@ -288,18 +290,25 @@ export function ChatScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: EVColors.background },
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   back: { padding: 16 },
   missing: {
     textAlign: 'center',
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     marginTop: 40,
   },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyChat: {
     textAlign: 'center',
-    color: EVColors.textHint,
+    color: c.textHint,
     marginTop: 40,
   },
   blockBanner: {
@@ -338,7 +347,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: EVColors.divider,
+    borderBottomColor: c.divider,
   },
   peerTap: {
     flex: 1,
@@ -353,8 +362,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  name: { fontWeight: '800', fontSize: 15, color: EVColors.textPrimary },
-  listing: { marginTop: 1, fontSize: 12, color: EVColors.textHint },
+  name: { fontWeight: '800', fontSize: 15, color: c.textPrimary },
+  listing: { marginTop: 1, fontSize: 12, color: c.textHint },
   messages: { padding: 14, gap: 8, flexGrow: 1 },
   bubble: {
     maxWidth: '80%',
@@ -364,13 +373,13 @@ const styles = StyleSheet.create({
   },
   bubbleMe: {
     alignSelf: 'flex-end',
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
   },
   bubbleThem: {
     alignSelf: 'flex-start',
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
   },
   bubbleText: { fontSize: 14, lineHeight: 20 },
   composer: {
@@ -380,7 +389,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: EVColors.divider,
+    borderTopColor: c.divider,
   },
   input: {
     flex: 1,
@@ -388,18 +397,19 @@ const styles = StyleSheet.create({
     maxHeight: 100,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: EVColors.border,
-    backgroundColor: EVColors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   send: {
     width: 42,
     height: 42,
     borderRadius: 14,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
 });
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { RootStackParamList } from '../navigation/types';
 import {
   FORUM_BRANDS,
@@ -44,13 +45,37 @@ import {
   formatBytes,
 } from '../lib/imageCompress';
 import { useBlockLists } from '../hooks/useBlockLists';
+import { HeroBanner } from '../components/HeroBanner';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+type FeedTab = 'recent' | 'popular' | 'unanswered';
+
+const FORUM_HERO = require('../../assets/forum-hero.jpg');
+
+const FEATURED_BRAND_IDS = [
+  'tesla',
+  'bmw',
+  'byd',
+  'hyundai',
+  'vw',
+  'audi',
+] as const;
+
+const FEED_TABS: { id: FeedTab; label: string }[] = [
+  { id: 'recent', label: 'Son Konular' },
+  { id: 'popular', label: 'Popüler' },
+  { id: 'unanswered', label: 'Cevapsız' },
+];
 
 export function ForumScreen() {
+  const { colors, styles } = useStyles();
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
   const { hiddenIds } = useBlockLists();
+  const searchRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const feedYRef = useRef(0);
+
   const [topics, setTopics] = useState<ForumTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,6 +83,7 @@ export function ForumScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeCategoryId, setActiveCategoryId] = useState('all');
   const [activeBrandId, setActiveBrandId] = useState('all');
+  const [feedTab, setFeedTab] = useState<FeedTab>('recent');
   const [searchQuery, setSearchQuery] = useState('');
   const [brandsExpanded, setBrandsExpanded] = useState(false);
   const [showNewTopic, setShowNewTopic] = useState(false);
@@ -97,11 +123,17 @@ export function ForumScreen() {
       ),
     [],
   );
-  const visibleBrands = brandsOnly.slice(0, 4);
+
+  const featuredBrands = useMemo(() => {
+    const byId = new Map(brandsOnly.map((b) => [b.id, b]));
+    return FEATURED_BRAND_IDS.map((id) => byId.get(id)).filter(
+      (b): b is (typeof brandsOnly)[number] => Boolean(b),
+    );
+  }, [brandsOnly]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return topics.filter((t) => {
+    let list = topics.filter((t) => {
       if (t.authorId && hiddenIds.has(t.authorId)) return false;
       const catOk =
         activeCategoryId === 'all' || t.categoryId === activeCategoryId;
@@ -115,7 +147,38 @@ export function ForumScreen() {
         t.excerpt.toLowerCase().includes(q);
       return catOk && brandOk && searchOk;
     });
-  }, [topics, activeCategoryId, activeBrandId, searchQuery, hiddenIds]);
+
+    if (feedTab === 'unanswered') {
+      list = list.filter((t) => t.replies === 0);
+    } else if (feedTab === 'popular') {
+      list = [...list].sort(
+        (a, b) => b.views + b.replies * 3 - (a.views + a.replies * 3),
+      );
+    }
+
+    return list;
+  }, [
+    topics,
+    activeCategoryId,
+    activeBrandId,
+    searchQuery,
+    hiddenIds,
+    feedTab,
+  ]);
+
+  const showAllTopics = () => {
+    setActiveCategoryId('all');
+    setActiveBrandId('all');
+    setFeedTab('recent');
+    setSearchQuery('');
+    setBrandsExpanded(false);
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, feedYRef.current - 8),
+        animated: true,
+      });
+    });
+  };
 
   const openDetail = (topic: ForumTopic) => {
     navigation.navigate('ForumDetail', { topic });
@@ -156,43 +219,78 @@ export function ForumScreen() {
   return (
     <View style={styles.root}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => void onRefresh()}
-            tintColor={EVColors.primary}
-            colors={[EVColors.primary]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
-        {/* App bar */}
-        <View style={styles.appBar}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.appBarEyebrow}>Topluluk</Text>
-            <Text style={styles.appBarTitle}>Forum</Text>
+        <View style={styles.topBar}>
+          <View style={styles.brandBlock}>
+            <View style={styles.logoMark}>
+              <Ionicons name="flash" size={16} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.brandTitle}>
+                <Text style={{ color: colors.primary }}>EV</Text>rywhere
+              </Text>
+              <Text style={styles.brandTagline}>Daha temiz yarınlar için</Text>
+            </View>
           </View>
-          <HeaderMessagesButton />
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => searchRef.current?.focus()}
+            hitSlop={6}
+          >
+            <Ionicons name="search" size={18} color={colors.primary} />
+          </Pressable>
+          <HeaderMessagesButton compact />
           <View style={styles.countPill}>
             <Text style={styles.countNum}>{filtered.length}</Text>
             <Text style={styles.countLabel}>konu</Text>
           </View>
         </View>
 
-        {/* Search */}
-        <View style={styles.search}>
-          <Ionicons name="search" size={18} color={EVColors.textHint} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Konu, marka veya içerik ara…"
-            placeholderTextColor={EVColors.textHint}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+        <View style={styles.heroWrap}>
+          <HeroBanner
+            source={FORUM_HERO}
+            eyebrow="Topluluk"
+            title="Forum"
+            subtitle="Deneyimlerini paylaş, sorularını sor, birlikte daha temiz yarınlar inşa edelim."
           />
+
+          <View style={styles.searchFloat}>
+            <Ionicons name="search" size={18} color={colors.textHint} />
+            <TextInput
+              ref={searchRef}
+              style={styles.searchInput}
+              placeholder="Konu, marka veya içerik ara…"
+              placeholderTextColor={colors.textHint}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+            />
+            <Pressable
+              style={styles.filterBtn}
+              onPress={() => setBrandsExpanded((v) => !v)}
+              hitSlop={6}
+            >
+              <Ionicons
+                name="options-outline"
+                size={18}
+                color={colors.primary}
+              />
+            </Pressable>
+          </View>
         </View>
 
-        {/* Categories */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -204,16 +302,17 @@ export function ForumScreen() {
               <Pressable
                 key={cat.id}
                 onPress={() => setActiveCategoryId(cat.id)}
-                style={[
-                  styles.chip,
-                  active && styles.chipActive,
-                ]}
+                style={[styles.chip, active && styles.chipActive]}
               >
                 <Text style={styles.chipEmoji}>{cat.emoji}</Text>
                 <Text
                   style={[
                     styles.chipLabel,
-                    { color: active ? EVColors.onPrimary : EVColors.textSecondary },
+                    {
+                      color: active
+                        ? colors.onPrimary
+                        : colors.textSecondary,
+                    },
                   ]}
                 >
                   {cat.label}
@@ -223,41 +322,52 @@ export function ForumScreen() {
           })}
         </ScrollView>
 
-        {/* Brands */}
-        <Text style={styles.brandHeading}>Markaya Göre</Text>
+        <View style={styles.brandHeadingRow}>
+          <Text style={styles.brandHeading}>Markaya Göre</Text>
+          <Pressable onPress={() => setBrandsExpanded((v) => !v)}>
+            <Text style={styles.brandSeeAll}>
+              {brandsExpanded ? 'Kapat' : 'Tümünü Gör >'}
+            </Text>
+          </Pressable>
+        </View>
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.brandsRow}
         >
-          {visibleBrands.map((brand) => {
+          {featuredBrands.map((brand) => {
             const active = brand.id === activeBrandId;
             return (
               <Pressable
                 key={brand.id}
-                onPress={() => {
-                  setActiveBrandId(brand.id);
-                  if (brandsExpanded) setBrandsExpanded(false);
-                }}
-                style={[
-                  styles.brandCard,
-                  {
-                    backgroundColor: active
-                      ? hexWithAlpha(brand.color, 0.12)
-                      : EVColors.surface,
-                    borderColor: active
-                      ? hexWithAlpha(brand.color, 0.5)
-                      : EVColors.border,
-                    borderWidth: active ? 1.5 : 1,
-                  },
-                ]}
+                onPress={() =>
+                  setActiveBrandId((prev) =>
+                    prev === brand.id ? 'all' : brand.id,
+                  )
+                }
+                style={styles.brandItem}
               >
-                <Text style={styles.brandEmoji}>{brand.emoji}</Text>
+                <View
+                  style={[
+                    styles.brandCircle,
+                    {
+                      backgroundColor: active
+                        ? hexWithAlpha(brand.color, 0.12)
+                        : colors.surface,
+                      borderColor: active
+                        ? hexWithAlpha(brand.color, 0.55)
+                        : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={styles.brandEmoji}>{brand.emoji}</Text>
+                </View>
                 <Text
                   numberOfLines={1}
                   style={[
-                    styles.brandName,
-                    { color: active ? brand.color : EVColors.textSecondary },
+                    styles.brandLabel,
+                    { color: active ? brand.color : colors.textSecondary },
                   ]}
                 >
                   {brand.name}
@@ -265,38 +375,6 @@ export function ForumScreen() {
               </Pressable>
             );
           })}
-          <Pressable
-            onPress={() => setBrandsExpanded((v) => !v)}
-            style={[
-              styles.brandCard,
-              {
-                backgroundColor: brandsExpanded
-                  ? EVColors.primaryLight
-                  : EVColors.surface,
-                borderColor: brandsExpanded
-                  ? EVColors.primary
-                  : EVColors.border,
-                borderWidth: brandsExpanded ? 1.5 : 1,
-              },
-            ]}
-          >
-            <Ionicons
-              name={brandsExpanded ? 'chevron-up' : 'chevron-down'}
-              size={26}
-              color={brandsExpanded ? EVColors.primary : EVColors.textHint}
-            />
-            <Text
-              style={[
-                styles.brandName,
-                {
-                  color: brandsExpanded ? EVColors.primary : EVColors.textHint,
-                  textAlign: 'center',
-                },
-              ]}
-            >
-              {brandsExpanded ? 'Kapat' : 'Tümünü\nGör'}
-            </Text>
-          </Pressable>
         </ScrollView>
 
         {brandsExpanded ? (
@@ -347,38 +425,16 @@ export function ForumScreen() {
                       styles.brandListName,
                       {
                         fontWeight: active ? '700' : '500',
-                        color: active ? brand.color : EVColors.textPrimary,
+                        color: active ? brand.color : colors.textPrimary,
                       },
                     ]}
                   >
                     {brand.name}
                   </Text>
-                  {brand.threadCount > 0 ? (
-                    <View
-                      style={[
-                        styles.threadPill,
-                        {
-                          backgroundColor: active
-                            ? hexWithAlpha(brand.color, 0.12)
-                            : EVColors.background,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: '500',
-                          color: active ? brand.color : EVColors.textHint,
-                        }}
-                      >
-                        {brand.threadCount} konu
-                      </Text>
-                    </View>
-                  ) : null}
                   <Ionicons
                     name={active ? 'checkmark-circle' : 'chevron-forward'}
                     size={18}
-                    color={active ? brand.color : EVColors.textHint}
+                    color={active ? brand.color : colors.textHint}
                   />
                 </Pressable>
               );
@@ -386,17 +442,50 @@ export function ForumScreen() {
           </View>
         ) : null}
 
-        {/* Section header */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {loading ? '…' : `${filtered.length} Konu`}
-          </Text>
-          <Text style={styles.sectionSort}>En Yeni</Text>
+        <View
+          style={styles.feedHeader}
+          onLayout={(e) => {
+            feedYRef.current = e.nativeEvent.layout.y;
+          }}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.feedTabs}
+          >
+            {FEED_TABS.map((tab) => {
+              const active = feedTab === tab.id;
+              return (
+                <Pressable
+                  key={tab.id}
+                  onPress={() => setFeedTab(tab.id)}
+                  style={styles.feedTab}
+                >
+                  <Text
+                    style={[
+                      styles.feedTabLabel,
+                      active && styles.feedTabLabelActive,
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                  {active ? <View style={styles.feedTabUnderline} /> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Pressable
+            style={styles.newTopicBtn}
+            onPress={() => setShowNewTopic(true)}
+          >
+            <Ionicons name="add" size={16} color="#fff" />
+            <Text style={styles.newTopicLabel}>Yeni Konu</Text>
+          </Pressable>
         </View>
 
         {loading ? (
           <View style={styles.empty}>
-            <ActivityIndicator size="large" color={EVColors.primary} />
+            <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.emptyText}>Konular yükleniyor…</Text>
           </View>
         ) : loadError ? (
@@ -404,7 +493,7 @@ export function ForumScreen() {
             <Ionicons
               name="cloud-offline-outline"
               size={48}
-              color={EVColors.textHint}
+              color={colors.textHint}
             />
             <Text style={styles.emptyText}>{loadError}</Text>
           </View>
@@ -413,7 +502,7 @@ export function ForumScreen() {
             <Ionicons
               name="chatbubbles-outline"
               size={48}
-              color={EVColors.textHint}
+              color={colors.textHint}
             />
             <Text style={styles.emptyText}>
               {topics.length === 0
@@ -422,35 +511,35 @@ export function ForumScreen() {
             </Text>
           </View>
         ) : (
-          filtered.map((topic) => (
-            <TopicCard
-              key={topic.id}
-              topic={topic}
-              onPress={() => openDetail(topic)}
-              onAuthorPress={() => {
-                if (!topic.authorId) {
-                  openDetail(topic);
-                  return;
-                }
-                navigation.navigate('UserProfile', {
-                  userId: topic.authorId,
-                  name: topic.authorName,
-                  initials: topic.authorInitials,
-                  color: topic.authorColor,
-                  contextTitle: topic.title,
-                });
-              }}
-            />
-          ))
+          <>
+            {filtered.map((topic) => (
+              <TopicCard
+                key={topic.id}
+                topic={topic}
+                onPress={() => openDetail(topic)}
+                onAuthorPress={() => {
+                  if (!topic.authorId) {
+                    openDetail(topic);
+                    return;
+                  }
+                  navigation.navigate('UserProfile', {
+                    userId: topic.authorId,
+                    name: topic.authorName,
+                    initials: topic.authorInitials,
+                    color: topic.authorColor,
+                    contextTitle: topic.title,
+                  });
+                }}
+              />
+            ))}
+            <Pressable style={styles.seeAllBtn} onPress={showAllTopics}>
+              <Text style={styles.seeAllLabel}>Tüm Konuları Gör →</Text>
+            </Pressable>
+          </>
         )}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 28 }} />
       </ScrollView>
-
-      <Pressable style={styles.fab} onPress={() => setShowNewTopic(true)}>
-        <Ionicons name="create-outline" size={17} color="#fff" />
-        <Text style={styles.fabLabel}>Yeni Konu</Text>
-      </Pressable>
 
       <NewTopicModal
         visible={showNewTopic}
@@ -471,93 +560,85 @@ function TopicCard({
   onPress: () => void;
   onAuthorPress: () => void;
 }) {
+  const { colors, styles } = useStyles();
   const badge =
     CATEGORY_BADGE[topic.categoryId] ?? CATEGORY_BADGE.general;
-  const brand = findBrand(topic.brandId);
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
-      <View style={styles.cardBadges}>
-        <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-          <Text style={[styles.badgeText, { color: badge.fg }]}>
-            {badge.label}
-          </Text>
-        </View>
-        {topic.isPinned ? (
-          <View style={[styles.badge, { backgroundColor: '#FFF8E1' }]}>
-            <Text style={[styles.badgeText, { color: '#BF6D00' }]}>
-              📌 Sabit
-            </Text>
-          </View>
-        ) : null}
-        {topic.isHot ? (
-          <View style={[styles.badge, { backgroundColor: '#FFEBEE' }]}>
-            <Text style={[styles.badgeText, { color: '#C62828' }]}>
-              🔥 Popüler
-            </Text>
-          </View>
-        ) : null}
-        {topic.brandId !== 'all' ? (
-          <View
-            style={[
-              styles.brandMini,
-              {
-                marginLeft: 'auto',
-                backgroundColor: hexWithAlpha(brand.color, 0.1),
-                borderColor: hexWithAlpha(brand.color, 0.25),
-              },
-            ]}
-          >
-            <Text style={{ fontSize: 10 }}>{brand.emoji}</Text>
-            <Text style={[styles.brandMiniText, { color: brand.color }]}>
-              {brand.name}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      <Text numberOfLines={2} style={styles.cardTitle}>
-        {topic.title}
-      </Text>
-      <Text numberOfLines={2} style={styles.cardExcerpt}>
-        {topic.excerpt}
-      </Text>
-
-      {topic.photoUrl ? (
-        <Image
-          source={{ uri: topic.photoUrl }}
-          style={styles.cardPhoto}
-          resizeMode="cover"
-        />
-      ) : null}
-
-      <Pressable style={styles.cardMeta} onPress={onAuthorPress}>
+      <Pressable style={styles.cardAvatarWrap} onPress={onAuthorPress}>
         <View
           style={[
-            styles.avatar,
+            styles.avatarLg,
             {
               backgroundColor: hexWithAlpha(topic.authorColor, 0.15),
-              borderColor: hexWithAlpha(topic.authorColor, 0.3),
+              borderColor: hexWithAlpha(topic.authorColor, 0.28),
             },
           ]}
         >
-          <Text style={[styles.avatarText, { color: topic.authorColor }]}>
+          <Text style={[styles.avatarLgText, { color: topic.authorColor }]}>
             {topic.authorInitials}
           </Text>
         </View>
-        <Text style={styles.authorName} numberOfLines={1}>
-          {topic.authorName}
-        </Text>
-        <Ionicons
-          name="chatbubble-outline"
-          size={12}
-          color={EVColors.textHint}
-        />
-        <Text style={styles.stat}>{formatCount(topic.replies)}</Text>
-        <Ionicons name="eye-outline" size={12} color={EVColors.textHint} />
-        <Text style={styles.stat}>{formatCount(topic.views)}</Text>
-        <Text style={styles.timeAgo}>{topic.timeAgo}</Text>
+        <View style={styles.onlineDot} />
       </Pressable>
+
+      <View style={styles.cardBody}>
+        <View style={styles.cardTopRow}>
+          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+            <Text style={[styles.badgeText, { color: badge.fg }]}>
+              {badge.label}
+            </Text>
+          </View>
+          {topic.isPinned ? (
+            <View style={[styles.badge, { backgroundColor: '#FFF8E1' }]}>
+              <Text style={[styles.badgeText, { color: '#BF6D00' }]}>
+                📌 Sabit
+              </Text>
+            </View>
+          ) : null}
+          {topic.isHot ? (
+            <View style={[styles.badge, { backgroundColor: '#FFEBEE' }]}>
+              <Text style={[styles.badgeText, { color: '#C62828' }]}>
+                🔥 Popüler
+              </Text>
+            </View>
+          ) : null}
+          <Ionicons
+            name="bookmark-outline"
+            size={18}
+            color={colors.textHint}
+            style={{ marginLeft: 'auto' }}
+          />
+        </View>
+
+        <Text numberOfLines={2} style={styles.cardTitle}>
+          {topic.title}
+        </Text>
+
+        <Text style={styles.cardMetaLine} numberOfLines={1}>
+          {topic.authorName} • {topic.timeAgo}
+        </Text>
+
+        {topic.photoUrl ? (
+          <Image
+            source={{ uri: topic.photoUrl }}
+            style={styles.cardPhoto}
+            resizeMode="cover"
+          />
+        ) : null}
+
+        <View style={styles.cardStats}>
+          <Ionicons
+            name="chatbubble-outline"
+            size={13}
+            color={colors.textHint}
+          />
+          <Text style={styles.stat}>{formatCount(topic.replies)}</Text>
+          <Ionicons name="eye-outline" size={13} color={colors.textHint} />
+          <Text style={styles.stat}>{formatCount(topic.views)}</Text>
+        </View>
+      </View>
     </Pressable>
   );
 }
@@ -579,6 +660,7 @@ function NewTopicModal({
     localPhotoUri?: string,
   ) => void | Promise<void>;
 }) {
+  const { colors, styles } = useStyles();
   const [title, setTitle] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [categoryId, setCategoryId] = useState('general');
@@ -590,7 +672,7 @@ function NewTopicModal({
 
   const cat = findCategory(categoryId);
   const brand = findBrand(brandId);
-  const catAccent = CATEGORY_ACCENT[categoryId] ?? EVColors.primary;
+  const catAccent = CATEGORY_ACCENT[categoryId] ?? colors.primary;
 
   useEffect(() => {
     if (!visible) {
@@ -659,7 +741,12 @@ function NewTopicModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         style={styles.modalOverlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -670,7 +757,7 @@ function NewTopicModal({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Yeni Konu</Text>
             <Pressable onPress={resetAndClose}>
-              <Ionicons name="close" size={22} color={EVColors.textSecondary} />
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
             </Pressable>
           </View>
 
@@ -681,7 +768,7 @@ function NewTopicModal({
               value={title}
               onChangeText={setTitle}
               placeholder="Konu başlığı"
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
             />
             <Text style={styles.fieldLabel}>Açıklama</Text>
             <TextInput
@@ -689,7 +776,7 @@ function NewTopicModal({
               value={excerpt}
               onChangeText={setExcerpt}
               placeholder="Kısaca ne hakkında?"
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
               multiline
             />
 
@@ -735,13 +822,13 @@ function NewTopicModal({
                 disabled={picking || submitting}
               >
                 {picking ? (
-                  <ActivityIndicator color={EVColors.primary} />
+                  <ActivityIndicator color={colors.primary} />
                 ) : (
                   <>
                     <Ionicons
                       name="image-outline"
                       size={22}
-                      color={EVColors.primary}
+                      color={colors.primary}
                     />
                     <Text style={styles.photoAddLabel}>Galeriden seç</Text>
                   </>
@@ -777,8 +864,8 @@ function NewTopicModal({
                     picker === 'category' ? id === categoryId : id === brandId;
                   const color =
                     picker === 'category'
-                      ? CATEGORY_ACCENT[id] ?? EVColors.primary
-                      : (item as { color?: string }).color ?? EVColors.primary;
+                      ? CATEGORY_ACCENT[id] ?? colors.primary
+                      : (item as { color?: string }).color ?? colors.primary;
                   const emoji = item.emoji;
                   const name =
                     picker === 'category'
@@ -797,10 +884,10 @@ function NewTopicModal({
                         {
                           backgroundColor: active
                             ? hexWithAlpha(color, 0.1)
-                            : EVColors.surface,
+                            : colors.surface,
                           borderColor: active
                             ? hexWithAlpha(color, 0.5)
-                            : EVColors.border,
+                            : colors.border,
                           borderWidth: active ? 1.5 : 1,
                         },
                       ]}
@@ -818,7 +905,7 @@ function NewTopicModal({
                           flex: 1,
                           fontSize: 14,
                           fontWeight: '600',
-                          color: active ? color : EVColors.textPrimary,
+                          color: active ? color : colors.textPrimary,
                         }}
                       >
                         {name}
@@ -858,6 +945,7 @@ function SelectorRow({
   accent: string;
   onPress: () => void;
 }) {
+  const { colors, styles } = useStyles();
   return (
     <View style={{ marginBottom: 14 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -892,115 +980,185 @@ function SelectorRow({
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: EVColors.background },
-  scroll: { paddingBottom: 24 },
-  appBar: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.background },
+  scroll: { paddingTop: 4, paddingBottom: 24 },
+  topBar: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  brandBlock: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    minWidth: 0,
   },
-  appBarEyebrow: { fontSize: 13, color: EVColors.textHint },
-  appBarTitle: {
-    fontSize: 28,
+  logoMark: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandTitle: {
+    fontSize: 18,
     fontWeight: '800',
-    color: EVColors.textPrimary,
-    letterSpacing: -0.6,
+    color: c.textPrimary,
+    letterSpacing: -0.4,
+  },
+  brandTagline: {
+    marginTop: 1,
+    fontSize: 11,
+    color: c.textSecondary,
+    fontWeight: '500',
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: c.primaryLight,
+    borderWidth: 1,
+    borderColor: c.primaryMid,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   countPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: EVColors.primaryLight,
-    borderWidth: 1,
-    borderColor: EVColors.primaryMid,
+    minWidth: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 22,
+    backgroundColor: c.primary,
     alignItems: 'center',
   },
   countNum: {
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '800',
-    color: EVColors.primary,
+    color: '#fff',
+    lineHeight: 16,
   },
   countLabel: {
-    fontSize: 10,
-    color: EVColors.textSecondary,
-    fontWeight: '500',
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
   },
-  search: {
-    marginTop: 16,
-    marginHorizontal: 20,
-    height: 46,
-    borderRadius: 14,
+  heroWrap: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  searchFloat: {
+    marginTop: -24,
+    marginHorizontal: 10,
+    height: 50,
+    borderRadius: 25,
     borderWidth: 1,
-    borderColor: EVColors.border,
-    backgroundColor: EVColors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
     gap: 8,
+    shadowColor: '#0D1B12',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     paddingVertical: 0,
   },
+  filterBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   chipsRow: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 14,
     gap: 8,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: EVColors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 22,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     gap: 5,
   },
   chipActive: {
-    backgroundColor: EVColors.primary,
-    borderColor: EVColors.primary,
+    backgroundColor: c.primary,
+    borderColor: c.primary,
   },
   chipEmoji: { fontSize: 12 },
   chipLabel: { fontSize: 12, fontWeight: '600' },
+  brandHeadingRow: {
+    marginTop: 18,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   brandHeading: {
-    marginTop: 16,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    fontSize: 13,
+    fontSize: 15,
+    fontWeight: '700',
+    color: c.textPrimary,
+  },
+  brandSeeAll: {
+    fontSize: 12,
     fontWeight: '600',
-    color: EVColors.textSecondary,
+    color: c.primary,
   },
   brandsRow: {
-    paddingHorizontal: 20,
-    gap: 10,
+    paddingHorizontal: 16,
+    gap: 14,
   },
-  brandCard: {
-    width: 72,
-    height: 76,
-    borderRadius: 16,
+  brandItem: {
+    width: 64,
+    alignItems: 'center',
+    gap: 6,
+  },
+  brandCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandEmoji: { fontSize: 22, marginBottom: 4 },
-  brandName: {
-    fontSize: 9,
+  brandEmoji: { fontSize: 24 },
+  brandLabel: {
+    fontSize: 11,
     fontWeight: '600',
-    lineHeight: 12,
+    textAlign: 'center',
   },
   brandList: {
-    marginHorizontal: 20,
-    marginTop: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: EVColors.border,
-    backgroundColor: EVColors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     overflow: 'hidden',
   },
   brandListHeader: {
@@ -1012,15 +1170,15 @@ const styles = StyleSheet.create({
   brandListTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   brandListReset: {
     marginLeft: 'auto',
     fontSize: 12,
     fontWeight: '500',
-    color: EVColors.primary,
+    color: c.primary,
   },
-  divider: { height: 1, backgroundColor: EVColors.divider },
+  divider: { height: 1, backgroundColor: c.divider },
   brandListItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1028,7 +1186,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: EVColors.divider,
+    borderBottomColor: c.divider,
   },
   brandAvatar: {
     width: 40,
@@ -1039,29 +1197,54 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   brandListName: { flex: 1, fontSize: 14 },
-  threadPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  sectionHeader: {
+  feedHeader: {
     marginTop: 20,
-    marginHorizontal: 20,
-    marginBottom: 10,
+    marginHorizontal: 16,
+    marginBottom: 8,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: EVColors.textPrimary,
-    letterSpacing: -0.3,
+  feedTabs: {
+    flexGrow: 1,
+    gap: 14,
+    paddingRight: 8,
+    alignItems: 'flex-end',
   },
-  sectionSort: {
+  feedTab: {
+    paddingBottom: 8,
+  },
+  feedTabLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: c.textHint,
+  },
+  feedTabLabelActive: {
+    color: c.textPrimary,
+    fontWeight: '800',
+  },
+  feedTabUnderline: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: c.primary,
+  },
+  newTopicBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: c.primary,
+  },
+  newTopicLabel: {
+    color: '#fff',
     fontSize: 12,
-    color: EVColors.primary,
-    fontWeight: '500',
+    fontWeight: '700',
   },
   empty: {
     paddingVertical: 60,
@@ -1070,23 +1253,51 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: EVColors.textHint,
+    color: c.textHint,
     fontWeight: '500',
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
   card: {
-    marginHorizontal: 20,
-    marginBottom: 10,
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: EVColors.surface,
-    borderWidth: 1,
-    borderColor: EVColors.border,
-  },
-  cardBadges: {
+    marginHorizontal: 16,
+    marginBottom: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.divider,
+  },
+  cardAvatarWrap: {
+    position: 'relative',
+    marginTop: 2,
+  },
+  avatarLg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLgText: { fontSize: 13, fontWeight: '800' },
+  onlineDot: {
+    position: 'absolute',
+    right: 0,
+    bottom: 1,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: c.primary,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  cardBody: { flex: 1, minWidth: 0 },
+  cardTopRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginBottom: 6,
   },
   badge: {
     paddingHorizontal: 9,
@@ -1094,97 +1305,67 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   badgeText: { fontSize: 10, fontWeight: '600' },
-  brandMini: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  brandMiniText: { fontSize: 9, fontWeight: '700' },
   cardTitle: {
-    marginTop: 10,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: EVColors.textPrimary,
-    lineHeight: 19,
+    color: c.textPrimary,
+    lineHeight: 21,
     letterSpacing: -0.2,
   },
-  cardExcerpt: {
+  cardMetaLine: {
     marginTop: 5,
     fontSize: 12,
-    color: EVColors.textSecondary,
-    lineHeight: 18,
+    color: c.textSecondary,
+    fontWeight: '500',
   },
   cardPhoto: {
     marginTop: 10,
     width: '100%',
-    height: 140,
+    height: 120,
     borderRadius: 12,
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
   },
-  cardMeta: {
-    marginTop: 12,
+  cardStats: {
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    justifyContent: 'flex-end',
+    gap: 5,
   },
-  avatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1,
+  stat: {
+    fontSize: 11,
+    color: c.textHint,
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  seeAllBtn: {
+    marginTop: 12,
+    marginHorizontal: 16,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: c.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontSize: 9, fontWeight: '700' },
-  authorName: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: '600',
-    color: EVColors.textSecondary,
-  },
-  stat: {
-    fontSize: 10,
-    color: EVColors.textHint,
-    fontWeight: '500',
-    marginRight: 4,
-  },
-  timeAgo: { fontSize: 10, color: EVColors.textHint },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    height: 50,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    backgroundColor: EVColors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    shadowColor: EVColors.primary,
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  fabLabel: {
+  seeAllLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#fff',
+    color: c.primary,
   },
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   modalBackdrop: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   modalSheet: {
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -1196,7 +1377,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: EVColors.border,
+    backgroundColor: c.border,
     marginTop: 10,
     marginBottom: 12,
   },
@@ -1209,23 +1390,23 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   fieldLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: EVColors.textSecondary,
+    color: c.textSecondary,
     marginBottom: 6,
   },
   field: {
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     marginBottom: 14,
   },
   fieldMultiline: {
@@ -1237,8 +1418,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: EVColors.primaryMid,
-    backgroundColor: EVColors.primaryLight,
+    borderColor: c.primaryMid,
+    backgroundColor: c.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
@@ -1247,15 +1428,15 @@ const styles = StyleSheet.create({
   photoAddLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: EVColors.primary,
+    color: c.primary,
   },
   photoPreviewWrap: {
     marginBottom: 14,
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: EVColors.border,
-    backgroundColor: EVColors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
   },
   photoPreview: {
     width: '100%',
@@ -1307,7 +1488,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     height: 52,
     borderRadius: 16,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1317,8 +1498,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   pickerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: EVColors.background,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: c.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
@@ -1326,7 +1511,7 @@ const styles = StyleSheet.create({
   pickerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     marginBottom: 12,
   },
   pickerItem: {
@@ -1348,7 +1533,9 @@ const styles = StyleSheet.create({
   pickerCancel: {
     marginTop: 12,
     textAlign: 'center',
-    color: EVColors.primary,
+    fontSize: 14,
     fontWeight: '600',
+    color: c.textSecondary,
   },
 });
+}

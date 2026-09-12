@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { EVColors } from '../theme/colors';
+import type { EVColorPalette } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { RootStackParamList } from '../navigation/types';
 import {
   CATEGORY_BADGE,
@@ -47,6 +48,7 @@ import { useBlockLists } from '../hooks/useBlockLists';
 type Props = NativeStackScreenProps<RootStackParamList, 'ForumDetail'>;
 
 export function ForumDetailScreen({ navigation, route }: Props) {
+  const { colors, styles } = useStyles();
   const { topic } = route.params;
   const { user } = useAuth();
   const { relationWith } = useBlockLists();
@@ -294,7 +296,7 @@ export function ForumDetailScreen({ navigation, route }: Props) {
               <Ionicons
                 name="chevron-back"
                 size={22}
-                color={EVColors.textPrimary}
+                color={colors.textPrimary}
               />
             </Pressable>
             <Text style={styles.topTitle}>Forum</Text>
@@ -319,7 +321,7 @@ export function ForumDetailScreen({ navigation, route }: Props) {
               style={{
                 textAlign: 'center',
                 marginTop: 12,
-                color: EVColors.textSecondary,
+                color: colors.textSecondary,
                 fontSize: 14,
               }}
             >
@@ -338,7 +340,7 @@ export function ForumDetailScreen({ navigation, route }: Props) {
             <Ionicons
               name="chevron-back"
               size={22}
-              color={EVColors.textPrimary}
+              color={colors.textPrimary}
             />
           </Pressable>
           <Text style={styles.topTitle} numberOfLines={1}>
@@ -353,7 +355,7 @@ export function ForumDetailScreen({ navigation, route }: Props) {
               <Ionicons
                 name={saved ? 'bookmark' : 'bookmark-outline'}
                 size={22}
-                color={saved ? EVColors.primary : EVColors.textPrimary}
+                color={saved ? colors.primary : colors.textPrimary}
               />
             </Pressable>
             {isTopicOwner ? (
@@ -363,12 +365,12 @@ export function ForumDetailScreen({ navigation, route }: Props) {
                 disabled={deletingTopic}
               >
                 {deletingTopic ? (
-                  <ActivityIndicator size="small" color={EVColors.error} />
+                  <ActivityIndicator size="small" color={colors.error} />
                 ) : (
                   <Ionicons
                     name="ellipsis-horizontal"
                     size={22}
-                    color={EVColors.textPrimary}
+                    color={colors.textPrimary}
                   />
                 )}
               </Pressable>
@@ -383,8 +385,8 @@ export function ForumDetailScreen({ navigation, route }: Props) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => void onRefresh()}
-              tintColor={EVColors.primary}
-              colors={[EVColors.primary]}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
         >
@@ -447,7 +449,7 @@ export function ForumDetailScreen({ navigation, route }: Props) {
               <Ionicons
                 name="chevron-forward"
                 size={16}
-                color={EVColors.textHint}
+                color={colors.textHint}
               />
             </Pressable>
 
@@ -465,14 +467,14 @@ export function ForumDetailScreen({ navigation, route }: Props) {
 
             <View style={styles.statsBar}>
               <View style={styles.statItem}>
-                <Ionicons name="eye-outline" size={14} color={EVColors.textHint} />
+                <Ionicons name="eye-outline" size={14} color={colors.textHint} />
                 <Text style={styles.statText}>{topic.views} görüntülenme</Text>
               </View>
               <View style={styles.statItem}>
                 <Ionicons
                   name="chatbubbles-outline"
                   size={14}
-                  color={EVColors.textHint}
+                  color={colors.textHint}
                 />
                 <Text style={styles.statText}>{replies} yanıt</Text>
               </View>
@@ -484,20 +486,20 @@ export function ForumDetailScreen({ navigation, route }: Props) {
                 style={[
                   styles.actionBtn,
                   liked && {
-                    backgroundColor: EVColors.primaryLight,
-                    borderColor: EVColors.primary,
+                    backgroundColor: colors.primaryLight,
+                    borderColor: colors.primary,
                   },
                 ]}
               >
                 <Ionicons
                   name={liked ? 'heart' : 'heart-outline'}
                   size={18}
-                  color={liked ? EVColors.primary : EVColors.textHint}
+                  color={liked ? colors.primary : colors.textHint}
                 />
                 <Text
                   style={[
                     styles.actionLabel,
-                    { color: liked ? EVColors.primary : EVColors.textSecondary },
+                    { color: liked ? colors.primary : colors.textSecondary },
                   ]}
                 >
                   Beğen
@@ -509,8 +511,8 @@ export function ForumDetailScreen({ navigation, route }: Props) {
                 style={[
                   styles.actionBtn,
                   saved && {
-                    backgroundColor: EVColors.primaryLight,
-                    borderColor: EVColors.primary,
+                    backgroundColor: colors.primaryLight,
+                    borderColor: colors.primary,
                   },
                 ]}
                 disabled={savingToggle}
@@ -518,12 +520,12 @@ export function ForumDetailScreen({ navigation, route }: Props) {
                 <Ionicons
                   name={saved ? 'bookmark' : 'bookmark-outline'}
                   size={18}
-                  color={saved ? EVColors.primary : EVColors.textHint}
+                  color={saved ? colors.primary : colors.textHint}
                 />
                 <Text
                   style={[
                     styles.actionLabel,
-                    { color: saved ? EVColors.primary : EVColors.textSecondary },
+                    { color: saved ? colors.primary : colors.textSecondary },
                   ]}
                 >
                   {saved ? 'Kaydedildi' : 'Kaydet'}
@@ -542,7 +544,7 @@ export function ForumDetailScreen({ navigation, route }: Props) {
 
           {loadingComments ? (
             <ActivityIndicator
-              color={EVColors.primary}
+              color={colors.primary}
               style={{ marginVertical: 24 }}
             />
           ) : comments.length === 0 ? (
@@ -550,7 +552,7 @@ export function ForumDetailScreen({ navigation, route }: Props) {
               <Ionicons
                 name="chatbubble-ellipses-outline"
                 size={28}
-                color={EVColors.textHint}
+                color={colors.textHint}
               />
               <Text style={styles.noComments}>
                 Henüz yanıt yok. İlk yanıtı sen yaz.
@@ -603,13 +605,13 @@ export function ForumDetailScreen({ navigation, route }: Props) {
                           {deletingCommentId === c.id ? (
                             <ActivityIndicator
                               size="small"
-                              color={EVColors.error}
+                              color={colors.error}
                             />
                           ) : (
                             <Ionicons
                               name="trash-outline"
                               size={16}
-                              color={EVColors.error}
+                              color={colors.error}
                             />
                           )}
                         </Pressable>
@@ -654,12 +656,12 @@ export function ForumDetailScreen({ navigation, route }: Props) {
               disabled={pickingPhoto || sending}
             >
               {pickingPhoto ? (
-                <ActivityIndicator size="small" color={EVColors.primary} />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <Ionicons
                   name="image-outline"
                   size={22}
-                  color={EVColors.primary}
+                  color={colors.primary}
                 />
               )}
             </Pressable>
@@ -668,7 +670,7 @@ export function ForumDetailScreen({ navigation, route }: Props) {
               value={commentText}
               onChangeText={setCommentText}
               placeholder="Yanıt yaz…"
-              placeholderTextColor={EVColors.textHint}
+              placeholderTextColor={colors.textHint}
               multiline
             />
             <Pressable
@@ -695,8 +697,15 @@ export function ForumDetailScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: EVColors.background },
+function useStyles() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return { colors, styles };
+}
+
+function makeStyles(c: EVColorPalette) {
+  return StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   flex: { flex: 1 },
   topBar: {
     flexDirection: 'row',
@@ -716,15 +725,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     marginHorizontal: 8,
   },
   scroll: { paddingHorizontal: 16, paddingBottom: 24 },
   postCard: {
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     padding: 16,
     marginBottom: 18,
   },
@@ -741,7 +750,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
     letterSpacing: -0.4,
     lineHeight: 28,
     marginBottom: 14,
@@ -763,29 +772,29 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 14,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   authorMeta: {
     marginTop: 2,
     fontSize: 12,
-    color: EVColors.textHint,
+    color: c.textHint,
   },
   postDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: EVColors.divider,
+    backgroundColor: c.divider,
     marginVertical: 14,
   },
   body: {
     fontSize: 16,
     lineHeight: 24,
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   topicPhoto: {
     width: '100%',
     height: 220,
     borderRadius: 14,
     marginTop: 14,
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
   },
   statsBar: {
     flexDirection: 'row',
@@ -794,10 +803,10 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: EVColors.divider,
+    borderTopColor: c.divider,
   },
   statItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  statText: { fontSize: 12, color: EVColors.textHint, fontWeight: '500' },
+  statText: { fontSize: 12, color: c.textHint, fontWeight: '500' },
   actions: {
     flexDirection: 'row',
     gap: 10,
@@ -812,8 +821,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: EVColors.border,
-    backgroundColor: EVColors.background,
+    borderColor: c.border,
+    backgroundColor: c.background,
   },
   actionLabel: {
     fontSize: 13,
@@ -829,21 +838,21 @@ const styles = StyleSheet.create({
   repliesTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   repliesCount: {
     minWidth: 24,
     height: 24,
     borderRadius: 12,
     paddingHorizontal: 8,
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   repliesCountText: {
     fontSize: 12,
     fontWeight: '700',
-    color: EVColors.primary,
+    color: c.primary,
   },
   emptyReplies: {
     alignItems: 'center',
@@ -852,7 +861,7 @@ const styles = StyleSheet.create({
   },
   noComments: {
     fontSize: 13,
-    color: EVColors.textHint,
+    color: c.textHint,
     textAlign: 'center',
   },
   replyCard: {
@@ -862,17 +871,17 @@ const styles = StyleSheet.create({
   replyRail: {
     width: 3,
     borderRadius: 2,
-    backgroundColor: EVColors.primaryMid,
+    backgroundColor: c.primaryMid,
     marginRight: 10,
     marginTop: 4,
     marginBottom: 4,
   },
   replyBody: {
     flex: 1,
-    backgroundColor: EVColors.surface,
+    backgroundColor: c.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: EVColors.border,
+    borderColor: c.border,
     padding: 12,
   },
   replyHeadRow: {
@@ -901,30 +910,30 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   replyIndex: {
     fontSize: 11,
     fontWeight: '600',
-    color: EVColors.primary,
+    color: c.primary,
   },
-  commentTime: { fontSize: 11, color: EVColors.textHint },
+  commentTime: { fontSize: 11, color: c.textHint },
   commentText: {
     fontSize: 14,
     lineHeight: 21,
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   replyPhoto: {
     marginTop: 10,
     width: '100%',
     height: 160,
     borderRadius: 10,
-    backgroundColor: EVColors.background,
+    backgroundColor: c.background,
   },
   composerWrap: {
     borderTopWidth: 1,
-    borderTopColor: EVColors.divider,
-    backgroundColor: EVColors.surface,
+    borderTopColor: c.divider,
+    backgroundColor: c.surface,
     paddingTop: 8,
   },
   composerPreview: {
@@ -962,7 +971,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: EVColors.primaryLight,
+    backgroundColor: c.primaryLight,
   },
   input: {
     flex: 1,
@@ -970,19 +979,20 @@ const styles = StyleSheet.create({
     maxHeight: 100,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: EVColors.border,
-    backgroundColor: EVColors.background,
+    borderColor: c.border,
+    backgroundColor: c.background,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 14,
-    color: EVColors.textPrimary,
+    color: c.textPrimary,
   },
   send: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: EVColors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
 });
+}
